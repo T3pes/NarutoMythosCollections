@@ -11,7 +11,8 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rarityFilter, setRarityFilter] = useState<string>('');
-  const [selectedCards, setSelectedCards] = useState<number[]>([]);
+  // Cambia la selezione delle carte per renderla univoca (id+name)
+  const [selectedCards, setSelectedCards] = useState<string[]>([]);
   // Azione di massa: aggiungi/rimuovi versione selezionata a tutte le carte selezionate
   const [massVersion, setMassVersion] = useState<string>('');
 
@@ -68,19 +69,26 @@ function Dashboard() {
     if (selectedCards.length === filteredCards.length) {
       setSelectedCards([]);
     } else {
-      setSelectedCards(filteredCards.map((card) => card.id));
+      setSelectedCards(filteredCards.map((card) => `${card.id}-${card.name}`));
     }
   };
 
-  const handleSelectCard = (cardId: number) => {
+  const handleSelectCard = (cardId: number, cardName: string) => {
+    const key = `${cardId}-${cardName}`;
     setSelectedCards((prev) =>
-      prev.includes(cardId) ? prev.filter((id) => id !== cardId) : [...prev, cardId]
+      prev.includes(key) ? prev.filter((id) => id !== key) : [...prev, key]
     );
   };
 
   const handleMassAdd = async () => {
     if (!user || !massVersion) return;
-    const toAdd = selectedCards.filter(cardId => !hasCardVersion(cardId, massVersion));
+    // Ricava gli id dalle chiavi selezionate
+    const toAdd = selectedCards
+      .map(key => {
+        const [id] = key.split('-');
+        return parseInt(id, 10);
+      })
+      .filter(cardId => !hasCardVersion(cardId, massVersion));
     if (toAdd.length === 0) return;
     await supabase.from('user_cards').insert(
       toAdd.map(cardId => ({ user_id: user.id, card_uuid: cardId, version: massVersion }))
@@ -89,12 +97,15 @@ function Dashboard() {
   };
   const handleMassRemove = async () => {
     if (!user || !massVersion) return;
-    await supabase.from('user_cards').delete().in('card_uuid', selectedCards).eq('user_id', user.id).eq('version', massVersion);
-    setUserCards(prev => prev.filter(uc => !(selectedCards.includes(uc.card_uuid) && uc.version === massVersion)));
+    // Ricava gli id dalle chiavi selezionate
+    const ids = selectedCards.map(key => parseInt(key.split('-')[0], 10));
+    await supabase.from('user_cards').delete().in('card_uuid', ids).eq('user_id', user.id).eq('version', massVersion);
+    setUserCards(prev => prev.filter(uc => !(ids.includes(uc.card_uuid) && uc.version === massVersion)));
   };
 
-  // Determina se mostrare la tripletta di versioni (solo per C e UC)
-  const showVersions = (rarity: string) => rarity === 'C' || rarity === 'UC';
+  // Determina se mostrare la tripletta di versioni (solo per C/UC/Common/Uncommon)
+  const showVersions = (rarity: string) =>
+    rarity === 'C' || rarity === 'UC' || rarity === 'Common' || rarity === 'Uncommon';
 
   return (
     <div className="p-4">
@@ -147,13 +158,13 @@ function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {filteredCards.length === 0 && <div className="col-span-full text-gray-500">Nessuna carta trovata.</div>}
           {filteredCards.map(card => (
-            <article key={`${card.id}-${card.name}-${card.version}`} className={`border rounded-lg p-3 bg-white flex flex-col items-center ${selectedCards.includes(card.id) ? 'ring-2 ring-orange-400' : ''}`}>
+            <article key={`${card.id}-${card.name}-${card.version}`} className={`border rounded-lg p-3 bg-white flex flex-col items-center ${selectedCards.includes(`${card.id}-${card.name}`) ? 'ring-2 ring-orange-400' : ''}`}>
               <div className="flex items-center w-full justify-between mb-1">
                 <div className="text-xs text-gray-500">#{card.id}</div>
                 <input
                   type="checkbox"
-                  checked={selectedCards.includes(card.id)}
-                  onChange={() => handleSelectCard(card.id)}
+                  checked={selectedCards.includes(`${card.id}-${card.name}`)}
+                  onChange={() => handleSelectCard(card.id, card.name)}
                   className="accent-orange-600"
                 />
               </div>
