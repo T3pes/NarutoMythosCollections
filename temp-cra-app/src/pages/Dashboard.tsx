@@ -11,7 +11,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rarityFilter, setRarityFilter] = useState<string>('');
-  // Cambia la selezione delle carte per renderla univoca (id+name)
+  // Selezione univoca tramite card_uuid
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   // Azione di massa: aggiungi/rimuovi versione selezionata a tutte le carte selezionate
   const [massVersion, setMassVersion] = useState<string>('');
@@ -43,20 +43,21 @@ function Dashboard() {
     loadAll();
   }, [user]);
 
-  const hasCardVersion = (cardId: number, version: string) =>
-    userCards.some((uc: any) => uc.card_uuid === cardId && uc.version === version);
+  // Usa cardUuid: string invece di cardId: number
+  const hasCardVersion = (cardUuid: string, version: string) =>
+    userCards.some((uc: any) => uc.card_uuid === cardUuid && uc.version === version);
 
-  const handleToggle = async (cardId: number, version: string) => {
+  const handleToggle = async (cardUuid: string, version: string) => {
     if (!user) return;
-    const exists = hasCardVersion(cardId, version);
+    const exists = hasCardVersion(cardUuid, version);
     if (exists) {
       // Rimuovi
-      await supabase.from('user_cards').delete().match({ user_id: user.id, card_uuid: cardId, version });
-      setUserCards((prev: any[]) => prev.filter((uc) => !(uc.card_uuid === cardId && uc.version === version)));
+      await supabase.from('user_cards').delete().match({ user_id: user.id, card_uuid: cardUuid, version });
+      setUserCards((prev: any[]) => prev.filter((uc) => !(uc.card_uuid === cardUuid && uc.version === version)));
     } else {
       // Aggiungi
-      await supabase.from('user_cards').insert([{ user_id: user.id, card_uuid: cardId, version }]);
-      setUserCards((prev: any[]) => [...prev, { user_id: user.id, card_uuid: cardId, version }]);
+      await supabase.from('user_cards').insert([{ user_id: user.id, card_uuid: cardUuid, version }]);
+      setUserCards((prev: any[]) => [...prev, { user_id: user.id, card_uuid: cardUuid, version }]);
     }
   };
 
@@ -69,38 +70,30 @@ function Dashboard() {
     if (selectedCards.length === filteredCards.length) {
       setSelectedCards([]);
     } else {
-      setSelectedCards(filteredCards.map((card) => `${card.id}-${card.name}`));
+      setSelectedCards(filteredCards.map((card) => card.card_uuid));
     }
   };
 
-  const handleSelectCard = (cardId: number, cardName: string) => {
-    const key = `${cardId}-${cardName}`;
+  const handleSelectCard = (cardUuid: string) => {
     setSelectedCards((prev) =>
-      prev.includes(key) ? prev.filter((id) => id !== key) : [...prev, key]
+      prev.includes(cardUuid) ? prev.filter((id) => id !== cardUuid) : [...prev, cardUuid]
     );
   };
 
   const handleMassAdd = async () => {
     if (!user || !massVersion) return;
-    // Ricava gli id dalle chiavi selezionate
-    const toAdd = selectedCards
-      .map(key => {
-        const [id] = key.split('-');
-        return parseInt(id, 10);
-      })
-      .filter(cardId => !hasCardVersion(cardId, massVersion));
+    // Usa direttamente i card_uuid selezionati
+    const toAdd = selectedCards.filter(cardUuid => !hasCardVersion(cardUuid, massVersion));
     if (toAdd.length === 0) return;
     await supabase.from('user_cards').insert(
-      toAdd.map(cardId => ({ user_id: user.id, card_uuid: cardId, version: massVersion }))
+      toAdd.map(cardUuid => ({ user_id: user.id, card_uuid: cardUuid, version: massVersion }))
     );
-    setUserCards(prev => ([...prev, ...toAdd.map(cardId => ({ user_id: user.id, card_uuid: cardId, version: massVersion }))]));
+    setUserCards(prev => ([...prev, ...toAdd.map(cardUuid => ({ user_id: user.id, card_uuid: cardUuid, version: massVersion }))]));
   };
   const handleMassRemove = async () => {
     if (!user || !massVersion) return;
-    // Ricava gli id dalle chiavi selezionate
-    const ids = selectedCards.map(key => parseInt(key.split('-')[0], 10));
-    await supabase.from('user_cards').delete().in('card_uuid', ids).eq('user_id', user.id).eq('version', massVersion);
-    setUserCards(prev => prev.filter(uc => !(ids.includes(uc.card_uuid) && uc.version === massVersion)));
+    await supabase.from('user_cards').delete().in('card_uuid', selectedCards).eq('user_id', user.id).eq('version', massVersion);
+    setUserCards(prev => prev.filter(uc => !(selectedCards.includes(uc.card_uuid) && uc.version === massVersion)));
   };
 
   // Determina se mostrare la tripletta di versioni (solo per C/UC/Common/Uncommon)
@@ -158,13 +151,13 @@ function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {filteredCards.length === 0 && <div className="col-span-full text-gray-500">Nessuna carta trovata.</div>}
           {filteredCards.map(card => (
-            <article key={`${card.id}-${card.name}-${card.version}`} className={`border rounded-lg p-3 bg-white flex flex-col items-center ${selectedCards.includes(`${card.id}-${card.name}`) ? 'ring-2 ring-orange-400' : ''}`}>
+            <article key={`${card.id}-${card.name}-${card.version}`} className={`border rounded-lg p-3 bg-white flex flex-col items-center ${selectedCards.includes(card.card_uuid) ? 'ring-2 ring-orange-400' : ''}`}>
               <div className="flex items-center w-full justify-between mb-1">
                 <div className="text-xs text-gray-500">#{card.id}</div>
                 <input
                   type="checkbox"
-                  checked={selectedCards.includes(`${card.id}-${card.name}`)}
-                  onChange={() => handleSelectCard(card.id, card.name)}
+                  checked={selectedCards.includes(card.card_uuid)}
+                  onChange={() => handleSelectCard(card.card_uuid)}
                   className="accent-orange-600"
                 />
               </div>
@@ -193,8 +186,8 @@ function Dashboard() {
                   <label key={v} className="flex items-center gap-1 text-xs">
                     <input
                       type="checkbox"
-                      checked={hasCardVersion(card.id, v)}
-                      onChange={() => handleToggle(card.id, v)}
+                      checked={hasCardVersion(card.card_uuid, v)}
+                      onChange={() => handleToggle(card.card_uuid, v)}
                       disabled={!user}
                     />
                     {v}
