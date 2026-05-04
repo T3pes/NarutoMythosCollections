@@ -11,7 +11,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rarityFilter, setRarityFilter] = useState<string>('');
-  // Selezione univoca tramite card_uuid+version
+  // Selezione univoca tramite card_uuid (una sola checkbox per carta)
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   // Azione di massa: aggiungi/rimuovi versione selezionata a tutte le carte selezionate
   const [massVersion, setMassVersion] = useState<string>('');
@@ -66,46 +66,38 @@ function Dashboard() {
     ? cards.filter((card) => card.rarity === rarityFilter)
     : cards;
 
+  // Seleziona/deseleziona tutte le carte visibili
   const handleSelectAll = () => {
-    if (selectedCards.length === filteredCards.length * VERSIONS.length) {
+    if (selectedCards.length === filteredCards.length) {
       setSelectedCards([]);
     } else {
-      const allKeys = filteredCards.flatMap(card =>
-        showVersions(card.rarity)
-          ? VERSIONS.map(v => `${card.card_uuid}-${v}`)
-          : [`${card.card_uuid}-normale`]
-      );
-      setSelectedCards(allKeys);
+      setSelectedCards(filteredCards.map(card => card.card_uuid));
     }
-  };
+  }
 
-  const handleSelectCard = (cardUuid: string, version: string) => {
-    const key = `${cardUuid}-${version}`;
+  // Seleziona/deseleziona una singola carta
+  const handleSelectCard = (cardUuid: string) => {
     setSelectedCards((prev) =>
-      prev.includes(key) ? prev.filter((id) => id !== key) : [...prev, key]
+      prev.includes(cardUuid) ? prev.filter((id) => id !== cardUuid) : [...prev, cardUuid]
     );
-  };
+  }
 
+  // Azione di massa: aggiungi la versione selezionata a tutte le carte selezionate
   const handleMassAdd = async () => {
     if (!user || !massVersion) return;
-    // Ricava le coppie card_uuid-version selezionate
-    const toAdd = selectedCards
-      .filter(key => key.endsWith(`-${massVersion}`))
-      .map(key => key.split('-')[0])
-      .filter(cardUuid => !hasCardVersion(cardUuid, massVersion));
+    // Filtra solo le carte selezionate che non hanno già la versione
+    const toAdd = selectedCards.filter(cardUuid => !hasCardVersion(cardUuid, massVersion));
     if (toAdd.length === 0) return;
     await supabase.from('user_cards').insert(
       toAdd.map(cardUuid => ({ user_id: user.id, card_uuid: cardUuid, version: massVersion }))
     );
     setUserCards(prev => ([...prev, ...toAdd.map(cardUuid => ({ user_id: user.id, card_uuid: cardUuid, version: massVersion }))]));
   };
+  // Azione di massa: rimuovi la versione selezionata da tutte le carte selezionate
   const handleMassRemove = async () => {
     if (!user || !massVersion) return;
-    const toRemove = selectedCards
-      .filter(key => key.endsWith(`-${massVersion}`))
-      .map(key => key.split('-')[0]);
-    await supabase.from('user_cards').delete().in('card_uuid', toRemove).eq('user_id', user.id).eq('version', massVersion);
-    setUserCards(prev => prev.filter(uc => !(toRemove.includes(uc.card_uuid) && uc.version === massVersion)));
+    await supabase.from('user_cards').delete().in('card_uuid', selectedCards).eq('user_id', user.id).eq('version', massVersion);
+    setUserCards(prev => prev.filter(uc => !(selectedCards.includes(uc.card_uuid) && uc.version === massVersion)));
   };
 
   // Determina se mostrare la tripletta di versioni (solo per C/UC/Common/Uncommon)
@@ -165,27 +157,16 @@ function Dashboard() {
           {filteredCards.map(card => (
             <article key={`${card.id}-${card.name}-${card.version}`} className={`border rounded-lg p-3 bg-white flex flex-col items-center`}>
               <div className="flex items-center w-full justify-between mb-1">
-                <div className="text-xs text-gray-500">#{card.id}</div>
-                {showVersions(card.rarity) ? (
-                  <div className="flex gap-1">
-                    {VERSIONS.map(v => (
-                      <input
-                        key={v}
-                        type="checkbox"
-                        checked={selectedCards.includes(`${card.card_uuid}-${v}`)}
-                        onChange={() => handleSelectCard(card.card_uuid, v)}
-                        className="accent-orange-600"
-                      />
-                    ))}
-                  </div>
-                ) : (
+                {/* Checkbox di selezione singola per la carta (non per versione) */}
+                <label className="flex items-center gap-1">
                   <input
                     type="checkbox"
-                    checked={selectedCards.includes(`${card.card_uuid}-normale`)}
-                    onChange={() => handleSelectCard(card.card_uuid, 'normale')}
+                    checked={selectedCards.includes(card.card_uuid)}
+                    onChange={() => handleSelectCard(card.card_uuid)}
                     className="accent-orange-600"
                   />
-                )}
+                  <span className="text-xs text-gray-500">#{card.id}</span>
+                </label>
               </div>
               <h3 className="font-semibold text-sm mb-2 text-center">{card.name}</h3>
               {card.image_url ? (
@@ -208,17 +189,29 @@ function Dashboard() {
               <div className="text-xs text-gray-700">Versione: <strong>{card.version}</strong></div>
               <div className="text-xs text-gray-700">Set: <strong>{card.set}</strong></div>
               <div className="mt-2 flex gap-2">
-                {showVersions(card.rarity) && VERSIONS.map((v) => (
-                  <label key={v} className="flex items-center gap-1 text-xs">
+                {showVersions(card.rarity) ? (
+                  VERSIONS.map((v) => (
+                    <label key={v} className="flex items-center gap-1 text-xs">
+                      <input
+                        type="checkbox"
+                        checked={hasCardVersion(card.card_uuid, v)}
+                        onChange={() => handleToggle(card.card_uuid, v)}
+                        disabled={!user}
+                      />
+                      {v}
+                    </label>
+                  ))
+                ) : (
+                  <label className="flex items-center gap-1 text-xs">
                     <input
                       type="checkbox"
-                      checked={hasCardVersion(card.card_uuid, v)}
-                      onChange={() => handleToggle(card.card_uuid, v)}
+                      checked={hasCardVersion(card.card_uuid, card.version)}
+                      onChange={() => handleToggle(card.card_uuid, card.version)}
                       disabled={!user}
                     />
-                    {v}
+                    {card.version}
                   </label>
-                ))}
+                )}
               </div>
             </article>
           ))}
