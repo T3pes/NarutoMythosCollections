@@ -112,6 +112,14 @@ function Dashboard() {
     ? cards.filter((card) => card.rarity === rarityFilter)
     : cards;
 
+  // Raggruppa le carte per card_uuid (mostra una sola card per card_uuid)
+  const groupedCards: any[] = Object.values(
+    filteredCards.reduce((acc, card) => {
+      if (!acc[card.card_uuid]) acc[card.card_uuid] = card;
+      return acc;
+    }, {} as { [cardUuid: string]: any })
+  );
+
 
   return (
     <div className="p-4">
@@ -147,8 +155,8 @@ function Dashboard() {
       {!loading && !error && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {filteredCards.length === 0 && <div className="col-span-full text-gray-500">Nessuna carta trovata.</div>}
-          {filteredCards.map(card => (
-            <article key={`${card.id}-${card.name}-${card.version}`} className={`border rounded-lg p-3 bg-white flex flex-col items-center`}>
+          {groupedCards.map(card => (
+            <article key={card.card_uuid} className={`border rounded-lg p-3 bg-white flex flex-col items-center`}>
               <div className="flex items-center w-full justify-between mb-1">
                 {/* Checkbox di selezione singola per la carta (non per versione) */}
                 <label className="flex items-center gap-1">
