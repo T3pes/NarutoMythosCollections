@@ -35,14 +35,25 @@ function CardList() {
   const [cards, setCards] = useState<CardView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string>('');
 
   useEffect(() => {
     async function loadCards() {
       setLoading(true);
       setError(null);
+      setErrorDetails('');
+
       const { data, error } = await supabase.from('cards').select('*');
       if (error) {
-        setError('Impossibile caricare le carte da Supabase.');
+        if (error.code === 'PGRST205') {
+          setError('Tabella public.cards non trovata su Supabase.');
+          setErrorDetails(
+            'Crea la tabella in schema public e verifica che il progetto Supabase configurato nelle variabili ambiente sia quello corretto.'
+          );
+        } else {
+          setError('Impossibile caricare le carte da Supabase.');
+          setErrorDetails(`${error.code ?? 'UNKNOWN'} - ${error.message}`);
+        }
         setLoading(false);
         return;
       }
@@ -64,7 +75,12 @@ function CardList() {
       <p className="text-sm text-gray-600 mb-4">Totale carte caricate: {total}</p>
 
       {loading && <div className="text-sm">Caricamento carte...</div>}
-      {error && <div className="text-sm text-red-600">{error}</div>}
+      {error && (
+        <div className="text-sm text-red-600 mb-3">
+          <div>{error}</div>
+          {errorDetails && <div className="mt-1 text-xs text-red-500">{errorDetails}</div>}
+        </div>
+      )}
 
       {!loading && !error && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
