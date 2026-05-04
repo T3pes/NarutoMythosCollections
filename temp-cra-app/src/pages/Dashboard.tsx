@@ -11,7 +11,7 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rarityFilter, setRarityFilter] = useState<string>('');
-  // Selezione univoca tramite card_uuid
+  // Selezione univoca tramite card_uuid+version
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   // Azione di massa: aggiungi/rimuovi versione selezionata a tutte le carte selezionate
   const [massVersion, setMassVersion] = useState<string>('');
@@ -67,23 +67,32 @@ function Dashboard() {
     : cards;
 
   const handleSelectAll = () => {
-    if (selectedCards.length === filteredCards.length) {
+    if (selectedCards.length === filteredCards.length * VERSIONS.length) {
       setSelectedCards([]);
     } else {
-      setSelectedCards(filteredCards.map((card) => card.card_uuid));
+      const allKeys = filteredCards.flatMap(card =>
+        showVersions(card.rarity)
+          ? VERSIONS.map(v => `${card.card_uuid}-${v}`)
+          : [`${card.card_uuid}-normale`]
+      );
+      setSelectedCards(allKeys);
     }
   };
 
-  const handleSelectCard = (cardUuid: string) => {
+  const handleSelectCard = (cardUuid: string, version: string) => {
+    const key = `${cardUuid}-${version}`;
     setSelectedCards((prev) =>
-      prev.includes(cardUuid) ? prev.filter((id) => id !== cardUuid) : [...prev, cardUuid]
+      prev.includes(key) ? prev.filter((id) => id !== key) : [...prev, key]
     );
   };
 
   const handleMassAdd = async () => {
     if (!user || !massVersion) return;
-    // Usa direttamente i card_uuid selezionati
-    const toAdd = selectedCards.filter(cardUuid => !hasCardVersion(cardUuid, massVersion));
+    // Ricava le coppie card_uuid-version selezionate
+    const toAdd = selectedCards
+      .filter(key => key.endsWith(`-${massVersion}`))
+      .map(key => key.split('-')[0])
+      .filter(cardUuid => !hasCardVersion(cardUuid, massVersion));
     if (toAdd.length === 0) return;
     await supabase.from('user_cards').insert(
       toAdd.map(cardUuid => ({ user_id: user.id, card_uuid: cardUuid, version: massVersion }))
@@ -92,8 +101,11 @@ function Dashboard() {
   };
   const handleMassRemove = async () => {
     if (!user || !massVersion) return;
-    await supabase.from('user_cards').delete().in('card_uuid', selectedCards).eq('user_id', user.id).eq('version', massVersion);
-    setUserCards(prev => prev.filter(uc => !(selectedCards.includes(uc.card_uuid) && uc.version === massVersion)));
+    const toRemove = selectedCards
+      .filter(key => key.endsWith(`-${massVersion}`))
+      .map(key => key.split('-')[0]);
+    await supabase.from('user_cards').delete().in('card_uuid', toRemove).eq('user_id', user.id).eq('version', massVersion);
+    setUserCards(prev => prev.filter(uc => !(toRemove.includes(uc.card_uuid) && uc.version === massVersion)));
   };
 
   // Determina se mostrare la tripletta di versioni (solo per C/UC/Common/Uncommon)
@@ -151,15 +163,29 @@ function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {filteredCards.length === 0 && <div className="col-span-full text-gray-500">Nessuna carta trovata.</div>}
           {filteredCards.map(card => (
-            <article key={`${card.id}-${card.name}-${card.version}`} className={`border rounded-lg p-3 bg-white flex flex-col items-center ${selectedCards.includes(card.card_uuid) ? 'ring-2 ring-orange-400' : ''}`}>
+            <article key={`${card.id}-${card.name}-${card.version}`} className={`border rounded-lg p-3 bg-white flex flex-col items-center`}>
               <div className="flex items-center w-full justify-between mb-1">
                 <div className="text-xs text-gray-500">#{card.id}</div>
-                <input
-                  type="checkbox"
-                  checked={selectedCards.includes(card.card_uuid)}
-                  onChange={() => handleSelectCard(card.card_uuid)}
-                  className="accent-orange-600"
-                />
+                {showVersions(card.rarity) ? (
+                  <div className="flex gap-1">
+                    {VERSIONS.map(v => (
+                      <input
+                        key={v}
+                        type="checkbox"
+                        checked={selectedCards.includes(`${card.card_uuid}-${v}`)}
+                        onChange={() => handleSelectCard(card.card_uuid, v)}
+                        className="accent-orange-600"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <input
+                    type="checkbox"
+                    checked={selectedCards.includes(`${card.card_uuid}-normale`)}
+                    onChange={() => handleSelectCard(card.card_uuid, 'normale')}
+                    className="accent-orange-600"
+                  />
+                )}
               </div>
               <h3 className="font-semibold text-sm mb-2 text-center">{card.name}</h3>
               {card.image_url ? (
