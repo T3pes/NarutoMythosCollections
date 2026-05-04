@@ -112,6 +112,7 @@ function Dashboard() {
     ? cards.filter((card) => card.rarity === rarityFilter)
     : cards;
 
+
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Tutte le carte</h1>
