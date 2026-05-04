@@ -58,32 +58,24 @@ function Dashboard() {
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Tutte le carte</h1>
-      {user && (
-        <div className="mb-4 flex items-center gap-2">
-          <span className="text-sm">{user.email}</span>
-          <button
-            className="ml-2 px-2 py-1 text-xs bg-gray-200 rounded hover:bg-gray-300"
-            onClick={signOut}
-          >
-            Logout
-          </button>
-        </div>
-      )}
       {loading && <div>Caricamento carte...</div>}
       {error && <div className="text-red-600">{error}</div>}
       {!loading && !error && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {cards.length === 0 && <div className="col-span-full text-gray-500">Nessuna carta trovata.</div>}
           {cards.map(card => (
             <article key={`${card.id}-${card.name}-${card.version}`} className="border rounded-lg p-3 bg-white">
               <div className="text-xs text-gray-500 mb-1">#{card.id}</div>
               <h3 className="font-semibold text-sm mb-2">{card.name}</h3>
               {card.image_url ? (
-                <img
-                  src={card.image_url}
-                  alt={`Carta ${card.id} - ${card.name}`}
-                  className="w-full h-52 object-cover rounded mb-2 bg-gray-100"
-                  loading="lazy"
-                />
+                <a href={card.image_url} target="_blank" rel="noopener noreferrer">
+                  <img
+                    src={card.image_url}
+                    alt={`Carta ${card.id} - ${card.name}`}
+                    className="w-full h-52 object-cover rounded mb-2 bg-gray-100"
+                    loading="lazy"
+                  />
+                </a>
               ) : (
                 <div className="w-full h-52 rounded mb-2 bg-gray-100 flex items-center justify-center text-xs text-gray-500">
                   Immagine non disponibile
