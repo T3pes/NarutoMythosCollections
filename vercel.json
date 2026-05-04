@@ -1,6 +1,4 @@
 {
-  "buildCommand": "cd temp-cra-app && npm install && npm run build",
-  "outputDirectory": "temp-cra-app/build",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
