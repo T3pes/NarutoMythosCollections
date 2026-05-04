@@ -1,5 +1,31 @@
-card_number,name,image_url,rarity,category,set_name
-1,Naruto Uzumaki,https://example.com/card-001.jpg,C,Protagonista,Naruto Mythos
-2,Sasuke Uchiha,https://example.com/card-002.jpg,UC,Protagonista,Naruto Mythos
-3,Sakura Haruno,https://example.com/card-003.jpg,C,Protagonista,Naruto Mythos
-
+id,name,image_url,set,rarity,type,version
+1,Naruto Uzumaki,https://example.com/card-001.jpg,Set Base,Common,Ninja,normale
+1,Naruto Uzumaki,https://example.com/card-001.jpg,Set Base,Common,Ninja,fullart
+1,Naruto Uzumaki,https://example.com/card-001.jpg,Set Base,Common,Ninja,holo
+2,Sasuke Uchiha,https://example.com/card-002.jpg,Set Base,Rare,Ninja,normale
+2,Sasuke Uchiha,https://example.com/card-002.jpg,Set Base,Rare,Ninja,fullart
+2,Sasuke Uchiha,https://example.com/card-002.jpg,Set Base,Rare,Ninja,holo
+3,Sakura Haruno,https://example.com/card-003.jpg,Set Base,Uncommon,Ninja,normale
+3,Sakura Haruno,https://example.com/card-003.jpg,Set Base,Uncommon,Ninja,fullart
+3,Sakura Haruno,https://example.com/card-003.jpg,Set Base,Uncommon,Ninja,holo
+4,Kakashi Hatake,https://example.com/card-004.jpg,Set Base,Super Rare,Ninja,normale
+4,Kakashi Hatake,https://example.com/card-004.jpg,Set Base,Super Rare,Ninja,fullart
+4,Kakashi Hatake,https://example.com/card-004.jpg,Set Base,Super Rare,Ninja,holo
+5,Chidori,https://example.com/card-005.jpg,Set Base,Common,Jutsu,normale
+5,Chidori,https://example.com/card-005.jpg,Set Base,Common,Jutsu,fullart
+5,Chidori,https://example.com/card-005.jpg,Set Base,Common,Jutsu,holo
+6,Sharingan,https://example.com/card-006.jpg,Set Base,Rare,Jutsu,normale
+6,Sharingan,https://example.com/card-006.jpg,Set Base,Rare,Jutsu,fullart
+6,Sharingan,https://example.com/card-006.jpg,Set Base,Rare,Jutsu,holo
+7,Rock Lee,https://example.com/card-007.jpg,Set Base,Common,Ninja,normale
+7,Rock Lee,https://example.com/card-007.jpg,Set Base,Common,Ninja,fullart
+7,Rock Lee,https://example.com/card-007.jpg,Set Base,Common,Ninja,holo
+8,Gaara,https://example.com/card-008.jpg,Set Base,Rare,Ninja,normale
+8,Gaara,https://example.com/card-008.jpg,Set Base,Rare,Ninja,fullart
+8,Gaara,https://example.com/card-008.jpg,Set Base,Rare,Ninja,holo
+9,Shikamaru Nara,https://example.com/card-009.jpg,Set Base,Uncommon,Ninja,normale
+9,Shikamaru Nara,https://example.com/card-009.jpg,Set Base,Uncommon,Ninja,fullart
+9,Shikamaru Nara,https://example.com/card-009.jpg,Set Base,Uncommon,Ninja,holo
+10,Neji Hyuga,https://example.com/card-010.jpg,Set Base,Super Rare,Ninja,normale
+10,Neji Hyuga,https://example.com/card-010.jpg,Set Base,Super Rare,Ninja,fullart
+10,Neji Hyuga,https://example.com/card-010.jpg,Set Base,Super Rare,Ninja,holo
