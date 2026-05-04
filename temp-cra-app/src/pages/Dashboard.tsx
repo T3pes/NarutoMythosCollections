@@ -61,23 +61,24 @@ function Dashboard() {
       {loading && <div>Caricamento carte...</div>}
       {error && <div className="text-red-600">{error}</div>}
       {!loading && !error && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {cards.length === 0 && <div className="col-span-full text-gray-500">Nessuna carta trovata.</div>}
           {cards.map(card => (
-            <article key={`${card.id}-${card.name}-${card.version}`} className="border rounded-lg p-3 bg-white">
+            <article key={`${card.id}-${card.name}-${card.version}`} className="border rounded-lg p-3 bg-white flex flex-col items-center">
               <div className="text-xs text-gray-500 mb-1">#{card.id}</div>
-              <h3 className="font-semibold text-sm mb-2">{card.name}</h3>
+              <h3 className="font-semibold text-sm mb-2 text-center">{card.name}</h3>
               {card.image_url ? (
-                <a href={card.image_url} target="_blank" rel="noopener noreferrer">
+                <a href={card.image_url} target="_blank" rel="noopener noreferrer" className="block w-full">
                   <img
                     src={card.image_url}
                     alt={`Carta ${card.id} - ${card.name}`}
-                    className="w-full h-52 object-cover rounded mb-2 bg-gray-100"
+                    className="w-auto h-64 mx-auto rounded mb-2 bg-gray-100 object-contain"
+                    style={{ maxHeight: 260, maxWidth: '100%' }}
                     loading="lazy"
                   />
                 </a>
               ) : (
-                <div className="w-full h-52 rounded mb-2 bg-gray-100 flex items-center justify-center text-xs text-gray-500">
+                <div className="w-full h-64 rounded mb-2 bg-gray-100 flex items-center justify-center text-xs text-gray-500">
                   Immagine non disponibile
                 </div>
               )}
