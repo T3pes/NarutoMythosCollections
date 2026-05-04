@@ -1,98 +1,53 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
-
-type CardRow = Record<string, unknown>;
-
-type CardView = {
-  id: string;
-  name: string;
-  imageUrl: string;
-  rarity: string;
-  type: string;
-  version: string;
-  setName: string;
-};
-
-function asText(value: unknown, fallback = ''): string {
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number') return String(value);
-  return fallback;
-}
-
-function normalizeCardRow(row: CardRow): CardView {
-  const id = asText(row.id ?? row.card_number ?? row.cardNumber, '-');
-  const name = asText(row.name ?? row.title, 'Carta senza nome');
-  const imageUrl = asText(row.image_url ?? row.imageUrl ?? row.image, '');
-  const rarity = asText(row.rarity, '-');
-  const type = asText(row.type ?? row.category, '-');
-  const version = asText(row.version ?? row.variant, '-');
-  const setName = asText(row.set ?? row.set_name ?? row.setName, '-');
-
-  return { id, name, imageUrl, rarity, type, version, setName };
-}
+import { useAuth } from '../auth/AuthContext';
 
 function CardList() {
-  const [cards, setCards] = useState<CardView[]>([]);
+  const { user } = useAuth();
+  const [userCards, setUserCards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [errorDetails, setErrorDetails] = useState<string>('');
 
   useEffect(() => {
-    async function loadCards() {
+    async function loadUserCards() {
       setLoading(true);
       setError(null);
-      setErrorDetails('');
-
-      const { data, error } = await supabase.from('cards').select('*');
-      if (error) {
-        if (error.code === 'PGRST205') {
-          setError('Tabella public.cards non trovata su Supabase.');
-          setErrorDetails(
-            'Crea la tabella in schema public e verifica che il progetto Supabase configurato nelle variabili ambiente sia quello corretto.'
-          );
-        } else {
-          setError('Impossibile caricare le carte da Supabase.');
-          setErrorDetails(`${error.code ?? 'UNKNOWN'} - ${error.message}`);
-        }
+      if (!user) {
+        setUserCards([]);
         setLoading(false);
         return;
       }
-
-      const normalized = ((data ?? []) as CardRow[]).map(normalizeCardRow);
-      normalized.sort((a, b) => Number(a.id) - Number(b.id));
-      setCards(normalized);
+      // Prendi tutte le carte possedute dall'utente
+      const { data, error } = await supabase
+        .from('user_cards')
+        .select('card_id, version, cards (id, name, image_url, rarity, type, version, set)')
+        .eq('user_id', user.id);
+      if (error) {
+        setError('Errore nel caricamento delle carte utente');
+        setLoading(false);
+        return;
+      }
+      setUserCards(data ?? []);
       setLoading(false);
     }
-
-    loadCards();
-  }, []);
-
-  const total = useMemo(() => cards.length, [cards]);
+    loadUserCards();
+  }, [user]);
 
   return (
     <div className="p-4">
-      <h2 className="text-xl font-bold mb-1">Lista Carte</h2>
-      <p className="text-sm text-gray-600 mb-4">Totale carte caricate: {total}</p>
-
-      {loading && <div className="text-sm">Caricamento carte...</div>}
-      {error && (
-        <div className="text-sm text-red-600 mb-3">
-          <div>{error}</div>
-          {errorDetails && <div className="mt-1 text-xs text-red-500">{errorDetails}</div>}
-        </div>
-      )}
-
+      <h2 className="text-xl font-bold mb-1">Le tue carte</h2>
+      {loading && <div>Caricamento carte...</div>}
+      {error && <div className="text-red-600">{error}</div>}
       {!loading && !error && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {cards.map(card => (
-            <article key={`${card.id}-${card.name}-${card.version}`} className="border rounded-lg p-3 bg-white">
-              <div className="text-xs text-gray-500 mb-1">#{card.id}</div>
-              <h3 className="font-semibold text-sm mb-2">{card.name}</h3>
-
-              {card.imageUrl ? (
+          {userCards.map((uc) => (
+            <article key={`${uc.card_id}-${uc.version}`} className="border rounded-lg p-3 bg-white">
+              <div className="text-xs text-gray-500 mb-1">#{uc.cards.id}</div>
+              <h3 className="font-semibold text-sm mb-2">{uc.cards.name}</h3>
+              {uc.cards.image_url ? (
                 <img
-                  src={card.imageUrl}
-                  alt={`Carta ${card.id} - ${card.name}`}
+                  src={uc.cards.image_url}
+                  alt={`Carta ${uc.cards.id} - ${uc.cards.name}`}
                   className="w-full h-52 object-cover rounded mb-2 bg-gray-100"
                   loading="lazy"
                 />
@@ -101,11 +56,10 @@ function CardList() {
                   Immagine non disponibile
                 </div>
               )}
-
-              <div className="text-xs text-gray-700">Rarita`: <strong>{card.rarity}</strong></div>
-              <div className="text-xs text-gray-700">Tipo: <strong>{card.type}</strong></div>
-              <div className="text-xs text-gray-700">Versione: <strong>{card.version}</strong></div>
-              <div className="text-xs text-gray-700">Set: <strong>{card.setName}</strong></div>
+              <div className="text-xs text-gray-700">Rarità: <strong>{uc.cards.rarity}</strong></div>
+              <div className="text-xs text-gray-700">Tipo: <strong>{uc.cards.type}</strong></div>
+              <div className="text-xs text-gray-700">Versione: <strong>{uc.version}</strong></div>
+              <div className="text-xs text-gray-700">Set: <strong>{uc.cards.set}</strong></div>
             </article>
           ))}
         </div>
@@ -115,4 +69,3 @@ function CardList() {
 }
 
 export default CardList;
-

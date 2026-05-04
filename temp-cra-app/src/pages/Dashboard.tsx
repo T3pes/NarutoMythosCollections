@@ -2,38 +2,62 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../auth/AuthContext';
 
+const VERSIONS = ['normale', 'fullart', 'holo'];
+
 function Dashboard() {
   const { user, signOut } = useAuth();
   const [cards, setCards] = useState<any[]>([]);
+  const [userCards, setUserCards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadCards() {
+    async function loadAll() {
       setLoading(true);
       setError(null);
-      if (!user) {
-        setCards([]);
-        setLoading(false);
-        return;
-      }
-      // Carica solo le carte collezionate dall'utente (esempio: campo user_id)
-      // Se non hai user_id, mostra tutte le carte
-      const { data, error } = await supabase.from('cards').select('*');
-      if (error) {
+      // Carica tutte le carte
+      const { data: allCards, error: err1 } = await supabase.from('cards').select('*');
+      if (err1) {
         setError('Errore nel caricamento delle carte');
         setLoading(false);
         return;
       }
-      setCards(data ?? []);
+      setCards(allCards ?? []);
+      // Carica le carte possedute dall'utente
+      if (user) {
+        const { data: uc, error: err2 } = await supabase
+          .from('user_cards')
+          .select('card_id, version')
+          .eq('user_id', user.id);
+        setUserCards(uc ?? []);
+      } else {
+        setUserCards([]);
+      }
       setLoading(false);
     }
-    loadCards();
+    loadAll();
   }, [user]);
+
+  const hasCardVersion = (cardId: number, version: string) =>
+    userCards.some((uc: any) => uc.card_id === cardId && uc.version === version);
+
+  const handleToggle = async (cardId: number, version: string) => {
+    if (!user) return;
+    const exists = hasCardVersion(cardId, version);
+    if (exists) {
+      // Rimuovi
+      await supabase.from('user_cards').delete().match({ user_id: user.id, card_id: cardId, version });
+      setUserCards((prev: any[]) => prev.filter((uc) => !(uc.card_id === cardId && uc.version === version)));
+    } else {
+      // Aggiungi
+      await supabase.from('user_cards').insert([{ user_id: user.id, card_id: cardId, version }]);
+      setUserCards((prev: any[]) => [...prev, { user_id: user.id, card_id: cardId, version }]);
+    }
+  };
 
   return (
     <div className="p-4">
-      <h1 className="text-2xl font-bold mb-4">Le tue carte</h1>
+      <h1 className="text-2xl font-bold mb-4">Tutte le carte</h1>
       {user && (
         <div className="mb-4 flex items-center gap-2">
           <span className="text-sm">{user.email}</span>
@@ -69,6 +93,19 @@ function Dashboard() {
               <div className="text-xs text-gray-700">Tipo: <strong>{card.type}</strong></div>
               <div className="text-xs text-gray-700">Versione: <strong>{card.version}</strong></div>
               <div className="text-xs text-gray-700">Set: <strong>{card.set}</strong></div>
+              <div className="mt-2 flex gap-2">
+                {VERSIONS.map((v) => (
+                  <label key={v} className="flex items-center gap-1 text-xs">
+                    <input
+                      type="checkbox"
+                      checked={hasCardVersion(card.id, v)}
+                      onChange={() => handleToggle(card.id, v)}
+                      disabled={!user}
+                    />
+                    {v}
+                  </label>
+                ))}
+              </div>
             </article>
           ))}
         </div>
