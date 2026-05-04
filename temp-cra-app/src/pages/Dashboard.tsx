@@ -13,8 +13,8 @@ function Dashboard() {
   const [rarityFilter, setRarityFilter] = useState<string>('');
   // Selezione univoca tramite card_uuid (una sola checkbox per carta)
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
-  // Azione di massa: aggiungi/rimuovi versione selezionata a tutte le carte selezionate
-  const [massVersion, setMassVersion] = useState<string>('');
+  // Stato delle versioni selezionate per ogni carta (checkbox in basso)
+  const [selectedVersions, setSelectedVersions] = useState<{ [cardUuid: string]: string[] }>({});
 
   useEffect(() => {
     async function loadAll() {
@@ -82,22 +82,34 @@ function Dashboard() {
     );
   }
 
-  // Azione di massa: aggiungi la versione selezionata a tutte le carte selezionate
-  const handleMassAdd = async () => {
-    if (!user || !massVersion) return;
-    // Filtra solo le carte selezionate che non hanno già la versione
-    const toAdd = selectedCards.filter(cardUuid => !hasCardVersion(cardUuid, massVersion));
-    if (toAdd.length === 0) return;
-    await supabase.from('user_cards').insert(
-      toAdd.map(cardUuid => ({ user_id: user.id, card_uuid: cardUuid, version: massVersion }))
-    );
-    setUserCards(prev => ([...prev, ...toAdd.map(cardUuid => ({ user_id: user.id, card_uuid: cardUuid, version: massVersion }))]));
+  // Aggiorna la selezione delle versioni per una carta
+  const handleVersionToggle = (cardUuid: string, version: string) => {
+    setSelectedVersions(prev => {
+      const versions = prev[cardUuid] || [];
+      if (versions.includes(version)) {
+        return { ...prev, [cardUuid]: versions.filter(v => v !== version) };
+      } else {
+        return { ...prev, [cardUuid]: [...versions, version] };
+      }
+    });
   };
-  // Azione di massa: rimuovi la versione selezionata da tutte le carte selezionate
-  const handleMassRemove = async () => {
-    if (!user || !massVersion) return;
-    await supabase.from('user_cards').delete().in('card_uuid', selectedCards).eq('user_id', user.id).eq('version', massVersion);
-    setUserCards(prev => prev.filter(uc => !(selectedCards.includes(uc.card_uuid) && uc.version === massVersion)));
+
+  // Salva la selezione: per ogni carta selezionata, salvo solo le versioni selezionate in basso
+  const handleSaveSelection = async () => {
+    if (!user) return;
+    // Costruisci la lista completa delle coppie carta+versione da salvare
+    const toSave = selectedCards.flatMap(cardUuid =>
+      (selectedVersions[cardUuid] || []).map(version => ({ user_id: user.id, card_uuid: cardUuid, version }))
+    );
+    // Rimuovi tutte le user_cards dell'utente
+    await supabase.from('user_cards').delete().eq('user_id', user.id);
+    // Inserisci solo quelle selezionate
+    if (toSave.length > 0) {
+      await supabase.from('user_cards').insert(toSave);
+      setUserCards(toSave);
+    } else {
+      setUserCards([]);
+    }
   };
 
   // Determina se mostrare la tripletta di versioni (solo per C/UC/Common/Uncommon)
@@ -127,27 +139,11 @@ function Dashboard() {
         >
           {selectedCards.length === filteredCards.length && filteredCards.length > 0 ? 'Deseleziona tutti' : 'Seleziona tutti'}
         </button>
-        <label className="text-sm ml-4">
-          Azione di massa:
-          <select
-            className="ml-2 border rounded px-2 py-1 text-sm"
-            value={massVersion}
-            onChange={e => setMassVersion(e.target.value)}
-          >
-            <option value="">Seleziona versione</option>
-            {VERSIONS.map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
-        </label>
         <button
-          className="px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 border border-green-300"
-          onClick={handleMassAdd}
-          disabled={!user || !massVersion || selectedCards.length === 0}
-        >Aggiungi versione a selezionate</button>
-        <button
-          className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 border border-red-300"
-          onClick={handleMassRemove}
-          disabled={!user || !massVersion || selectedCards.length === 0}
-        >Rimuovi versione da selezionate</button>
+          className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 border border-blue-300"
+          onClick={handleSaveSelection}
+          disabled={!user || selectedCards.length === 0}
+        >Salva selezione</button>
       </div>
       {loading && <div>Caricamento carte...</div>}
       {error && <div className="text-red-600">{error}</div>}
@@ -189,28 +185,18 @@ function Dashboard() {
               <div className="text-xs text-gray-700">Versione: <strong>{card.version}</strong></div>
               <div className="text-xs text-gray-700">Set: <strong>{card.set}</strong></div>
               <div className="mt-2 flex gap-2">
-                {showVersions(card.rarity) ? (
+                {showVersions(card.rarity) && (
                   VERSIONS.map((v) => (
                     <label key={v} className="flex items-center gap-1 text-xs">
                       <input
                         type="checkbox"
-                        checked={hasCardVersion(card.card_uuid, v)}
-                        onChange={() => handleToggle(card.card_uuid, v)}
-                        disabled={!user}
+                        checked={(selectedVersions[card.card_uuid] || []).includes(v)}
+                        onChange={() => handleVersionToggle(card.card_uuid, v)}
+                        disabled={!selectedCards.includes(card.card_uuid)}
                       />
                       {v}
                     </label>
                   ))
-                ) : (
-                  <label className="flex items-center gap-1 text-xs">
-                    <input
-                      type="checkbox"
-                      checked={hasCardVersion(card.card_uuid, card.version)}
-                      onChange={() => handleToggle(card.card_uuid, card.version)}
-                      disabled={!user}
-                    />
-                    {card.version}
-                  </label>
                 )}
               </div>
             </article>
