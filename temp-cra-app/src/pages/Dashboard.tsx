@@ -93,6 +93,9 @@ function Dashboard() {
     setUserCards(prev => prev.filter(uc => !(selectedCards.includes(uc.card_uuid) && uc.version === massVersion)));
   };
 
+  // Determina se mostrare la tripletta di versioni (solo per C e UC)
+  const showVersions = (rarity: string) => rarity === 'C' || rarity === 'UC';
+
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Tutte le carte</h1>
@@ -175,7 +178,7 @@ function Dashboard() {
               <div className="text-xs text-gray-700">Versione: <strong>{card.version}</strong></div>
               <div className="text-xs text-gray-700">Set: <strong>{card.set}</strong></div>
               <div className="mt-2 flex gap-2">
-                {VERSIONS.map((v) => (
+                {showVersions(card.rarity) && VERSIONS.map((v) => (
                   <label key={v} className="flex items-center gap-1 text-xs">
                     <input
                       type="checkbox"
