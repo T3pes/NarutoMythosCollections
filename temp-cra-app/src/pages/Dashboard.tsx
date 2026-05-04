@@ -5,7 +5,7 @@ import { useAuth } from '../auth/AuthContext';
 const VERSIONS = ['normale', 'fullart', 'holo'];
 
 function Dashboard() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const [cards, setCards] = useState<any[]>([]);
   const [userCards, setUserCards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
