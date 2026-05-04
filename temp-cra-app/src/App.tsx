@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import CardList from './pages/CardList';
 import { useAuth } from './auth/AuthContext';
+import AppHeader from './AppHeader';
 
 function PrivateRoute({ children }: { children: ReactElement }) {
   const { user, loading } = useAuth();
@@ -14,12 +15,15 @@ function PrivateRoute({ children }: { children: ReactElement }) {
 
 function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-      <Route path="/cards" element={<PrivateRoute><CardList /></PrivateRoute>} />
-      <Route path="*" element={<Navigate to="/" />} />
-    </Routes>
+    <>
+      <AppHeader />
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+        <Route path="/cards" element={<PrivateRoute><CardList /></PrivateRoute>} />
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </>
   );
 }
 
