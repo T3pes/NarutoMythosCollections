@@ -1,5 +1,22 @@
 # Naruto Mythos Collection Tracker — Specifica per Web App
 
+**Stato attuale:**
+- Progetto migrato da Vite a Create React App (CRA) con TypeScript e Tailwind CSS.
+- Routing funzionante con React Router.
+- Dashboard visibile e struttura pagine pronta.
+- Configurazione Tailwind e PostCSS aggiornata per compatibilità CRA.
+- Collegamento a Supabase predisposto tramite variabili ambiente `.env`.
+- Struttura file e cartelle conforme alle best practice React.
+
+**Prossimi step:**
+- Implementare login e registrazione con Supabase Auth.
+- Sincronizzare la collezione utente con Supabase (cards e user_cards).
+- Implementare la visualizzazione e gestione delle carte (possessata/mancante, ricerca, filtri, statistiche, ecc.).
+- UI mobile-first e accessibilità.
+- Deploy su Vercel.
+
+---
+
 ## Obiettivo
 
 Creare una web app leggera, veloce e pratica per tenere traccia della collezione **Naruto Mythos Cards**.
@@ -439,11 +456,7 @@ Lista mancanti iniziale:
 
 ```ts
 export const INITIAL_MISSING_NUMBERS = [
-  1, 3, 5, 7, 8, 9, 10, 11, 13, 14, 17, 18, 19, 21, 22, 23,
-  25, 26, 27, 29, 30, 32, 33, 34, 36, 37, 38, 39, 40, 41, 42,
-  44, 45, 46, 47, 48, 49, 50, 52, 53, 54, 55, 56, 58, 60,
-  62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 76, 78,
-  80, 83, 87, 91
+  1, 3, 5, 7, 8, 9, 10, 11, 13, 14, 17, 18, 19, 21, 22, 23, 25, 26, 27, 29, 30, 32, 33, 34, 36, 37, 38, 39, 40, 41, 42, 44, 45, 46, 47, 48, 49, 50, 52, 53, 54, 55, 56, 58, 60, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 76, 78, 80, 83, 87, 91
 ];
 ```
 
