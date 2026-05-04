@@ -43,28 +43,19 @@ function Dashboard() {
     loadAll();
   }, [user]);
 
+  useEffect(() => {
+    // Pre-seleziona le versioni possedute per ogni carta selezionata
+    const versionsMap: { [cardUuid: string]: string[] } = {};
+    userCards.forEach(uc => {
+      if (!versionsMap[uc.card_uuid]) versionsMap[uc.card_uuid] = [];
+      versionsMap[uc.card_uuid].push(uc.version);
+    });
+    setSelectedVersions(versionsMap);
+  }, [userCards]);
+
   // Usa cardUuid: string invece di cardId: number
-  const hasCardVersion = (cardUuid: string, version: string) =>
-    userCards.some((uc: any) => uc.card_uuid === cardUuid && uc.version === version);
-
-  const handleToggle = async (cardUuid: string, version: string) => {
-    if (!user) return;
-    const exists = hasCardVersion(cardUuid, version);
-    if (exists) {
-      // Rimuovi
-      await supabase.from('user_cards').delete().match({ user_id: user.id, card_uuid: cardUuid, version });
-      setUserCards((prev: any[]) => prev.filter((uc) => !(uc.card_uuid === cardUuid && uc.version === version)));
-    } else {
-      // Aggiungi
-      await supabase.from('user_cards').insert([{ user_id: user.id, card_uuid: cardUuid, version }]);
-      setUserCards((prev: any[]) => [...prev, { user_id: user.id, card_uuid: cardUuid, version }]);
-    }
-  };
-
-  // Filtra le carte per rarità se selezionato
-  const filteredCards = rarityFilter
-    ? cards.filter((card) => card.rarity === rarityFilter)
-    : cards;
+  // const hasCardVersion = (cardUuid: string, version: string) =>
+  //   userCards.some((uc: any) => uc.card_uuid === cardUuid && uc.version === version);
 
   // Seleziona/deseleziona tutte le carte visibili
   const handleSelectAll = () => {
@@ -115,6 +106,11 @@ function Dashboard() {
   // Determina se mostrare la tripletta di versioni (solo per C/UC/Common/Uncommon)
   const showVersions = (rarity: string) =>
     rarity === 'C' || rarity === 'UC' || rarity === 'Common' || rarity === 'Uncommon';
+
+  // Filtra le carte per rarità se selezionato
+  const filteredCards = rarityFilter
+    ? cards.filter((card) => card.rarity === rarityFilter)
+    : cards;
 
   return (
     <div className="p-4">
