@@ -25,7 +25,7 @@ function Dashboard() {
       setCards(allCards ?? []);
       // Carica le carte possedute dall'utente
       if (user) {
-        const { data: uc, error: err2 } = await supabase
+        const { data: uc } = await supabase
           .from('user_cards')
           .select('card_id, version')
           .eq('user_id', user.id);
