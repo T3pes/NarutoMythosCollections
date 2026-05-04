@@ -27,7 +27,7 @@ function Dashboard() {
       if (user) {
         const { data: uc } = await supabase
           .from('user_cards')
-          .select('card_id, version')
+          .select('card_uuid, version')
           .eq('user_id', user.id);
         setUserCards(uc ?? []);
       } else {
@@ -39,19 +39,19 @@ function Dashboard() {
   }, [user]);
 
   const hasCardVersion = (cardId: number, version: string) =>
-    userCards.some((uc: any) => uc.card_id === cardId && uc.version === version);
+    userCards.some((uc: any) => uc.card_uuid === cardId && uc.version === version);
 
   const handleToggle = async (cardId: number, version: string) => {
     if (!user) return;
     const exists = hasCardVersion(cardId, version);
     if (exists) {
       // Rimuovi
-      await supabase.from('user_cards').delete().match({ user_id: user.id, card_id: cardId, version });
-      setUserCards((prev: any[]) => prev.filter((uc) => !(uc.card_id === cardId && uc.version === version)));
+      await supabase.from('user_cards').delete().match({ user_id: user.id, card_uuid: cardId, version });
+      setUserCards((prev: any[]) => prev.filter((uc) => !(uc.card_uuid === cardId && uc.version === version)));
     } else {
       // Aggiungi
-      await supabase.from('user_cards').insert([{ user_id: user.id, card_id: cardId, version }]);
-      setUserCards((prev: any[]) => [...prev, { user_id: user.id, card_id: cardId, version }]);
+      await supabase.from('user_cards').insert([{ user_id: user.id, card_uuid: cardId, version }]);
+      setUserCards((prev: any[]) => [...prev, { user_id: user.id, card_uuid: cardId, version }]);
     }
   };
 

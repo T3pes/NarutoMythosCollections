@@ -17,17 +17,22 @@ function CardList() {
         setLoading(false);
         return;
       }
-      // Prendi tutte le carte possedute dall'utente
+      // Join tra user_cards e cards tramite card_uuid -> uuid
       const { data, error } = await supabase
         .from('user_cards')
-        .select('card_id, version, cards (id, name, image_url, rarity, type, version, set)')
+        .select('card_uuid, version, cards:card_uuid (uuid, id, name, image_url, rarity, type, version, set)')
         .eq('user_id', user.id);
       if (error) {
         setError('Errore nel caricamento delle carte utente');
         setLoading(false);
         return;
       }
-      setUserCards(data ?? []);
+      // cards può essere null o oggetto
+      const normalized = (data ?? []).map((uc: any) => ({
+        ...uc,
+        cards: Array.isArray(uc.cards) ? uc.cards[0] : uc.cards
+      }));
+      setUserCards(normalized);
       setLoading(false);
     }
     loadUserCards();
@@ -40,11 +45,12 @@ function CardList() {
       {error && <div className="text-red-600">{error}</div>}
       {!loading && !error && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {userCards.length === 0 && <div className="col-span-full text-gray-500">Nessuna carta posseduta.</div>}
           {userCards.map((uc) => (
-            <article key={`${uc.card_id}-${uc.version}`} className="border rounded-lg p-3 bg-white">
-              <div className="text-xs text-gray-500 mb-1">#{uc.cards.id}</div>
-              <h3 className="font-semibold text-sm mb-2">{uc.cards.name}</h3>
-              {uc.cards.image_url ? (
+            <article key={`${uc.card_uuid}-${uc.version}`} className="border rounded-lg p-3 bg-white">
+              <div className="text-xs text-gray-500 mb-1">#{uc.cards?.id ?? '-'}</div>
+              <h3 className="font-semibold text-sm mb-2">{uc.cards?.name ?? 'Carta non trovata'}</h3>
+              {uc.cards?.image_url ? (
                 <img
                   src={uc.cards.image_url}
                   alt={`Carta ${uc.cards.id} - ${uc.cards.name}`}
@@ -56,10 +62,10 @@ function CardList() {
                   Immagine non disponibile
                 </div>
               )}
-              <div className="text-xs text-gray-700">Rarità: <strong>{uc.cards.rarity}</strong></div>
-              <div className="text-xs text-gray-700">Tipo: <strong>{uc.cards.type}</strong></div>
+              <div className="text-xs text-gray-700">Rarità: <strong>{uc.cards?.rarity ?? '-'}</strong></div>
+              <div className="text-xs text-gray-700">Tipo: <strong>{uc.cards?.type ?? '-'}</strong></div>
               <div className="text-xs text-gray-700">Versione: <strong>{uc.version}</strong></div>
-              <div className="text-xs text-gray-700">Set: <strong>{uc.cards.set}</strong></div>
+              <div className="text-xs text-gray-700">Set: <strong>{uc.cards?.set ?? '-'}</strong></div>
             </article>
           ))}
         </div>
