@@ -64,6 +64,14 @@ function Dashboard() {
 
   const filteredCards = rarityFilter ? cards.filter(c => c.rarity === rarityFilter) : cards;
 
+  // Chiavi dei gruppi presenti nella collezione (bordo verde)
+  const savedCardKeys = new Set(
+    userCards.map(uc => {
+      const card = cards.find(c => c.serial_id === uc.card_uuid);
+      return card ? String(card.id) + '-' + card.name : null;
+    }).filter(Boolean) as string[]
+  );
+
   // Raggruppa per id+nome (una card per carta fisica)
   const groupedCards: CardGroup[] = (() => {
     const groups: { [key: string]: CardGroup } = {};
@@ -177,7 +185,7 @@ function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {groupedCards.length === 0 && <div className="col-span-full text-gray-500">Nessuna carta trovata.</div>}
           {groupedCards.map(({ key, card }) => (
-            <article key={key} className="border rounded-lg p-3 bg-white flex flex-col items-center">
+            <article key={key} className={`border-2 rounded-lg p-3 bg-white flex flex-col items-center ${savedCardKeys.has(key) ? 'border-green-500' : 'border-gray-200'}`}>
               <div className="flex items-center w-full mb-1">
                 <label className="flex items-center gap-1">
                   <input
