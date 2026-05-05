@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useMatch } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
 import { useCollection } from './CollectionContext';
 
@@ -7,8 +7,11 @@ function AppHeader() {
   const { user, signOut } = useAuth();
   const { activeCollection } = useCollection();
   const navigate = useNavigate();
-  const { collectionId } = useParams<{ collectionId: string }>();
 
+  // useMatch funziona anche fuori da <Routes> — legge l'URL corrente
+  const matchDashboard = useMatch('/collection/:collectionId');
+  const matchSub = useMatch('/collection/:collectionId/*');
+  const collectionId = matchDashboard?.params.collectionId ?? matchSub?.params.collectionId;
   const isInCollection = Boolean(collectionId);
 
   const handleLogout = async () => {
@@ -19,20 +22,22 @@ function AppHeader() {
   return (
     <header className="bg-orange-600 text-white shadow mb-4">
       <div className="container mx-auto flex items-center justify-between px-4 py-3">
-        {/* Sinistra: titolo + breadcrumb */}
+        {/* Sinistra: breadcrumb + titolo */}
         <div className="flex items-center gap-3">
           {isInCollection && (
-            <Link
-              to="/"
-              className="text-orange-200 hover:text-white text-sm flex items-center gap-1"
-              title="Torna alle collezioni"
-            >
-              ← Collezioni
-            </Link>
+            <>
+              <Link
+                to="/"
+                className="text-orange-200 hover:text-white text-sm flex items-center gap-1"
+                title="Torna alle collezioni"
+              >
+                ← Collezioni
+              </Link>
+              <span className="text-orange-300 text-sm">/</span>
+            </>
           )}
-          {isInCollection && <span className="text-orange-300 text-sm">/</span>}
           <div className="font-bold text-xl tracking-wider">
-            {activeCollection ? activeCollection.name : 'My Card Collections'}
+            {isInCollection && activeCollection ? activeCollection.name : 'My Card Collections'}
           </div>
         </div>
 

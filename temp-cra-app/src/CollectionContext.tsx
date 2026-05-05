@@ -15,7 +15,7 @@ export const COLLECTIONS: Collection[] = [
     id: 'naruto-mythos',
     name: 'Naruto Mythos',
     description: 'Trading Card Game ufficiale basato sul manga Naruto',
-    logo: '/images/naruto-mythos-logo.webp',
+    logo: `${process.env.PUBLIC_URL}/images/naruto-mythos-logo.webp`,
     accentColor: 'orange',
     setName: '',  // vuoto = tutte le carte nel DB (per ora solo Naruto Mythos)
   },
