@@ -17,11 +17,12 @@ function CollectionCard({ collection }: { collection: Collection }) {
       className="group relative flex flex-col items-center bg-white rounded-2xl shadow-lg hover:shadow-2xl border-2 border-transparent hover:border-orange-400 transition-all duration-200 overflow-hidden w-64 cursor-pointer"
     >
       {/* Logo */}
-      <div className="w-full bg-gradient-to-b from-gray-900 to-gray-700 flex items-center justify-center p-6" style={{ minHeight: 280 }}>
+      <div className="w-full flex-1 overflow-hidden" style={{ minHeight: 280 }}>
         <img
           src={collection.logo}
           alt={`Logo ${collection.name}`}
-          className="h-64 w-auto object-contain drop-shadow-xl group-hover:scale-105 transition-transform duration-200"
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+          style={{ minHeight: 280 }}
         />
       </div>
 
