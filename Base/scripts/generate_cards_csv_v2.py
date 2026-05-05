@@ -14,7 +14,7 @@ import os
 HTML_PATH = r'C:\Users\flavi\IdeaProjects\NarutoMythosCollection\Base\naruto_mythos_card_list.html'
 OUTPUT_PATH = r'C:\Users\flavi\IdeaProjects\NarutoMythosCollection\Base\cards_v2.csv'
 
-IMAGE_BASE_URL = 'https://capsulecorpgear.com/wp-content/uploads/'
+IMAGE_BASE_URL = 'https://ekfwchaoknmsfpqocwsg.supabase.co/storage/v1/object/public/MythosCards%201%20edition/'
 SET_NAME = 'Prima Edizione'
 
 # Versioni disponibili per C e UC

@@ -15,7 +15,7 @@ export const COLLECTIONS: Collection[] = [
     id: 'naruto-mythos',
     name: 'Naruto Mythos',
     description: 'Trading Card Game ufficiale basato sul manga Naruto',
-    logo: 'https://capsulecorpgear.com/wp-content/uploads/Naruto_TCG_Card_Back-0dcade80-640w.webp',
+    logo: 'https://ekfwchaoknmsfpqocwsg.supabase.co/storage/v1/object/public/MythosCards%201%20edition/Naruto_TCG_Card_Back-0dcade80-640w.webp',
     accentColor: 'orange',
     setName: '',
   },
