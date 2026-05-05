@@ -2,19 +2,15 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../auth/AuthContext';
 
-const VERSIONS = ['normale', 'fullart', 'holo'];
-
 function Dashboard() {
   const { user } = useAuth();
   const [cards, setCards] = useState<any[]>([]);
-  const [userCards, setUserCards] = useState<any[]>([]);
+  const [, setUserCards] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rarityFilter, setRarityFilter] = useState<string>('');
   // Selezione univoca tramite card_uuid (una sola checkbox per carta)
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
-  // Stato delle versioni selezionate per ogni carta (checkbox in basso)
-  const [selectedVersions, setSelectedVersions] = useState<{ [serialId: string]: string[] }>({});
 
   useEffect(() => {
     async function loadAll() {
@@ -43,20 +39,6 @@ function Dashboard() {
     loadAll();
   }, [user]);
 
-  useEffect(() => {
-    // Pre-seleziona le versioni possedute per ogni carta selezionata
-    const versionsMap: { [serialId: string]: string[] } = {};
-    userCards.forEach(uc => {
-      if (!versionsMap[uc.card_uuid]) versionsMap[uc.card_uuid] = [];
-      versionsMap[uc.card_uuid].push(uc.version);
-    });
-    setSelectedVersions(versionsMap);
-  }, [userCards]);
-
-  // Usa cardUuid: string invece di cardId: number
-  // const hasCardVersion = (cardUuid: string, version: string) =>
-  //   userCards.some((uc: any) => uc.card_uuid === cardUuid && uc.version === version);
-
   // Seleziona/deseleziona tutte le carte visibili
   const handleSelectAll = () => {
     if (selectedCards.length === filteredCards.length) {
@@ -73,25 +55,12 @@ function Dashboard() {
     );
   }
 
-  // Aggiorna la selezione delle versioni per una carta
-  const handleVersionToggle = (serialId: string, version: string) => {
-    setSelectedVersions(prev => {
-      const versions = prev[serialId] || [];
-      if (versions.includes(version)) {
-        return { ...prev, [serialId]: versions.filter(v => v !== version) };
-      } else {
-        return { ...prev, [serialId]: [...versions, version] };
-      }
-    });
-  };
-
-  // Salva la selezione: per ogni carta selezionata, salvo solo le versioni selezionate in basso
+  // Salva la selezione: salva tutte le carte selezionate (serial_id/version)
   const handleSaveSelection = async () => {
     if (!user) return;
-    // Costruisci la lista completa delle coppie carta+versione da salvare
-    const toSave = selectedCards.flatMap(serialId =>
-      (selectedVersions[serialId] || []).map(version => ({ user_id: user.id, card_uuid: serialId, version }))
-    );
+    // Trova le carte selezionate
+    const toSave = filteredCards.filter(card => selectedCards.includes(card.serial_id))
+      .map(card => ({ user_id: user.id, card_uuid: card.serial_id, version: card.version }));
     // Rimuovi tutte le user_cards dell'utente
     await supabase.from('user_cards').delete().eq('user_id', user.id);
     // Inserisci solo quelle selezionate
@@ -103,15 +72,11 @@ function Dashboard() {
     }
   };
 
-  // Determina se mostrare la tripletta di versioni (solo per C/UC/Common/Uncommon)
-  const showVersions = (rarity: string) =>
-    rarity === 'C' || rarity === 'UC' || rarity === 'Common' || rarity === 'Uncommon';
 
   // Filtra le carte per rarità se selezionato
   const filteredCards = rarityFilter
     ? cards.filter((card) => card.rarity === rarityFilter)
     : cards;
-
 
   return (
     <div className="p-4">
@@ -150,7 +115,7 @@ function Dashboard() {
           {filteredCards.map(card => (
             <article key={card.id} className={`border rounded-lg p-3 bg-white flex flex-col items-center`}>
               <div className="flex items-center w-full justify-between mb-1">
-                {/* Checkbox di selezione singola per la carta (non per versione) */}
+                {/* Checkbox di selezione per ogni riga (serial_id) */}
                 <label className="flex items-center gap-1">
                   <input
                     type="checkbox"
@@ -181,21 +146,6 @@ function Dashboard() {
               <div className="text-xs text-gray-700">Tipo: <strong>{card.type}</strong></div>
               <div className="text-xs text-gray-700">Versione: <strong>{card.version}</strong></div>
               <div className="text-xs text-gray-700">Set: <strong>{card.set}</strong></div>
-              <div className="mt-2 flex gap-2">
-                {showVersions(card.rarity) && (
-                  VERSIONS.map((v) => (
-                    <label key={v} className="flex items-center gap-1 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={(selectedVersions[card.serial_id] || []).includes(v)}
-                        onChange={() => handleVersionToggle(card.serial_id, v)}
-                        disabled={!selectedCards.includes(card.serial_id)}
-                      />
-                      {v}
-                    </label>
-                  ))
-                )}
-              </div>
             </article>
           ))}
         </div>
