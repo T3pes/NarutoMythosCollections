@@ -42,6 +42,13 @@ function Dashboard() {
     loadAll();
   }, [user]);
 
+  const showVersions = (rarity: string) =>
+    rarity === 'C' || rarity === 'UC' || rarity === 'Common' || rarity === 'Uncommon';
+
+  // Chiave univoca: per C/UC raggruppa per id+nome (versioni multiple), per le altre usa serial_id
+  const getGroupKey = (card: any): string =>
+    showVersions(card.rarity) ? String(card.id) + '-' + card.name : card.serial_id;
+
   // Pre-popola selectedVersions dai dati salvati (ma NON selectedCards: le carte non appaiono pre-selezionate)
   useEffect(() => {
     if (cards.length === 0) return;
@@ -49,16 +56,12 @@ function Dashboard() {
     userCards.forEach(uc => {
       const card = cards.find(c => c.serial_id === uc.card_uuid);
       if (!card) return;
-      const groupKey = String(card.id) + '-' + card.name;
+      const groupKey = getGroupKey(card);
       if (!newVersions[groupKey]) newVersions[groupKey] = [];
       if (!newVersions[groupKey].includes(uc.version)) newVersions[groupKey].push(uc.version);
     });
     setSelectedVersions(newVersions);
-    // selectedCards NON viene pre-popolato: l'utente deve selezionare manualmente
   }, [userCards, cards]);
-
-  const showVersions = (rarity: string) =>
-    rarity === 'C' || rarity === 'UC' || rarity === 'Common' || rarity === 'Uncommon';
 
   const filteredCards = rarityFilter ? cards.filter(c => c.rarity === rarityFilter) : cards;
 
@@ -66,15 +69,15 @@ function Dashboard() {
   const savedCardKeys = new Set(
     userCards.map(uc => {
       const card = cards.find(c => c.serial_id === uc.card_uuid);
-      return card ? String(card.id) + '-' + card.name : null;
+      return card ? getGroupKey(card) : null;
     }).filter(Boolean) as string[]
   );
 
-  // Raggruppa per id+nome (una card per carta fisica)
+  // Raggruppa: C/UC per id+nome, altre per serial_id
   const groupedCards: CardGroup[] = (() => {
     const groups: { [key: string]: CardGroup } = {};
     filteredCards.forEach(card => {
-      const key = String(card.id) + '-' + card.name;
+      const key = getGroupKey(card);
       if (!groups[key]) groups[key] = { key, card, versions: {} };
       if (card.version && card.serial_id) groups[key].versions[card.version] = card.serial_id;
     });
@@ -111,7 +114,7 @@ function Dashboard() {
       // Costruisce i gruppi da TUTTE le carte (ignora il filtro attivo)
       const allGroups: { [key: string]: CardGroup } = {};
       cards.forEach(card => {
-        const key = String(card.id) + '-' + card.name;
+        const key = getGroupKey(card);
         if (!allGroups[key]) allGroups[key] = { key, card, versions: {} };
         if (card.version && card.serial_id) allGroups[key].versions[card.version] = card.serial_id;
       });
