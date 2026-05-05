@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../auth/AuthContext';
 
@@ -29,13 +29,14 @@ function Dashboard() {
         .from('cards').select('*').order('id', { ascending: true });
       if (err1) { setError('Errore nel caricamento delle carte'); setLoading(false); return; }
       setCards(allCards ?? []);
-      if (user) {
-        const { data: uc } = await supabase
-          .from('user_cards').select('card_uuid, version').eq('user_id', user.id);
-        setUserCards(uc ?? []);
-      } else {
+      if (!user) {
         setUserCards([]);
+        setLoading(false);
+        return;
       }
+      const { data: uc } = await supabase
+        .from('user_cards').select('card_uuid, version').eq('user_id', user.id);
+      setUserCards(uc ?? []);
       setLoading(false);
     }
     loadAll();
