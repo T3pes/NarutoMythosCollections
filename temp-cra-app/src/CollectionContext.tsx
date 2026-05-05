@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
+import narutoMythosLogo from './images/naruto-mythos-logo.webp';
 
 export interface Collection {
   id: string;
@@ -15,7 +16,7 @@ export const COLLECTIONS: Collection[] = [
     id: 'naruto-mythos',
     name: 'Naruto Mythos',
     description: 'Trading Card Game ufficiale basato sul manga Naruto',
-    logo: `${process.env.PUBLIC_URL}/images/naruto-mythos-logo.webp`,
+    logo: narutoMythosLogo,
     accentColor: 'orange',
     setName: '',  // vuoto = tutte le carte nel DB (per ora solo Naruto Mythos)
   },
