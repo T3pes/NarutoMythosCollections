@@ -7,9 +7,11 @@ const VERSIONS = ['normale', 'fullart', 'holo'];
 const showVersions = (rarity: string) =>
   rarity === 'C' || rarity === 'UC' || rarity === 'Common' || rarity === 'Uncommon';
 
-// Chiave univoca: per C/UC raggruppa per id+nome, per le altre usa serial_id (evita duplicati)
+// Chiave univoca: per C/UC raggruppa per id+nome, per le altre usa serial_id (con fallback robusto)
 const getGroupKey = (card: any): string =>
-  showVersions(card.rarity) ? String(card.id) + '-' + card.name : card.serial_id;
+  showVersions(card.rarity)
+    ? String(card.id) + '-' + card.name
+    : (card.serial_id ?? String(card.id) + '-' + card.name + '-' + (card.rarity ?? '') + '-' + (card.version ?? ''));
 
 interface CardGroup {
   key: string;
@@ -86,10 +88,14 @@ function Dashboard() {
   })();
 
   const handleSelectAll = () => {
-    if (selectedCards.length === groupedCards.length && groupedCards.length > 0) {
-      setSelectedCards([]);
+    const currentKeys = groupedCards.map(g => g.key);
+    const allCurrentSelected = currentKeys.every(k => selectedCards.includes(k));
+    if (allCurrentSelected && currentKeys.length > 0) {
+      // Deseleziona solo le carte visibili, mantieni le altre
+      setSelectedCards(prev => prev.filter(k => !currentKeys.includes(k)));
     } else {
-      setSelectedCards(groupedCards.map(g => g.key));
+      // Aggiunge le carte visibili a quelle già selezionate (accumula tra filtri)
+      setSelectedCards(prev => Array.from(new Set([...prev, ...currentKeys])));
     }
   };
 
@@ -177,7 +183,7 @@ function Dashboard() {
           </select>
         </label>
         <button className="ml-4 px-2 py-1 text-xs bg-orange-600 text-white rounded hover:bg-orange-700 border border-orange-300" onClick={handleSelectAll}>
-          {selectedCards.length === groupedCards.length && groupedCards.length > 0 ? 'Deseleziona tutti' : 'Seleziona tutti'}
+          {groupedCards.every(g => selectedCards.includes(g.key)) && groupedCards.length > 0 ? 'Deseleziona visibili' : 'Seleziona visibili'}
         </button>
         <button
           className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 border border-blue-300 disabled:opacity-50"
