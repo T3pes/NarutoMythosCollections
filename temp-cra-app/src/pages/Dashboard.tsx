@@ -123,8 +123,9 @@ function Dashboard() {
         if (!group) return;
         if (showVersions(group.card.rarity)) {
           // C/UC: aggiunge solo le versioni selezionate non ancora presenti
+          // Usa il serial_id specifico per la versione, o in fallback quello della carta rappresentante
           (selectedVersions[groupKey] || []).forEach(version => {
-            const serialId = group.versions[version];
+            const serialId = group.versions[version] ?? group.card.serial_id;
             if (serialId && !userCards.some(uc => uc.card_uuid === serialId && uc.version === version)) {
               toAdd.push({ user_id: user.id, card_uuid: serialId, version });
             }
