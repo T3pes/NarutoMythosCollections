@@ -2,33 +2,42 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../auth/AuthContext';
 
+type Tab = 'possedute' | 'mancanti';
+
 function CardList() {
   const { user } = useAuth();
-  const [userCards, setUserCards] = useState<any[]>([]);
+  const [allCards, setAllCards] = useState<any[]>([]);
+  const [ownedUuids, setOwnedUuids] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>('possedute');
   const [rarityFilter, setRarityFilter] = useState<string>('');
   const [versionFilter, setVersionFilter] = useState<string>('');
   const [setFilter, setSetFilter] = useState<string>('');
 
   useEffect(() => {
-    async function loadUserCards() {
+    async function load() {
       setLoading(true);
       setError(null);
-      if (!user) { setUserCards([]); setLoading(false); return; }
-      const { data, error: err } = await supabase
+
+      const { data: cards, error: err1 } = await supabase
+        .from('cards')
+        .select('*')
+        .order('id', { ascending: true });
+      if (err1) { setError('Errore caricamento carte'); setLoading(false); return; }
+      setAllCards(cards ?? []);
+
+      if (!user) { setOwnedUuids(new Set()); setLoading(false); return; }
+
+      const { data: uc, error: err2 } = await supabase
         .from('user_cards')
-        .select('card_uuid, cards:card_uuid(serial_id, id, name, image_url, rarity, type, version, set)')
+        .select('card_uuid')
         .eq('user_id', user.id);
-      if (err) { setError('Errore nel caricamento delle carte utente'); setLoading(false); return; }
-      const normalized = (data ?? []).map((uc: any) => ({
-        ...uc,
-        cards: Array.isArray(uc.cards) ? uc.cards[0] : uc.cards,
-      }));
-      setUserCards(normalized);
+      if (err2) { setError('Errore caricamento collezione'); setLoading(false); return; }
+      setOwnedUuids(new Set((uc ?? []).map((r: any) => r.card_uuid)));
       setLoading(false);
     }
-    loadUserCards();
+    load();
   }, [user]);
 
   const handleRemove = async (cardUuid: string) => {
@@ -38,25 +47,72 @@ function CardList() {
       .delete()
       .match({ user_id: user.id, card_uuid: cardUuid });
     if (!err) {
-      setUserCards(prev => prev.filter(uc => uc.card_uuid !== cardUuid));
+      setOwnedUuids(prev => {
+        const next = new Set(Array.from(prev));
+        next.delete(cardUuid);
+        return next;
+      });
     } else {
       console.error('Errore rimozione:', err);
     }
   };
 
-  const rarities = Array.from(new Set(userCards.map(uc => uc.cards?.rarity).filter(Boolean)));
-  const versions = Array.from(new Set(userCards.map(uc => uc.cards?.version).filter(Boolean)));
-  const sets = Array.from(new Set(userCards.map(uc => uc.cards?.set).filter(Boolean)));
+  const ownedCards = allCards.filter(c => ownedUuids.has(c.serial_id));
+  const missingCards = allCards.filter(c => !ownedUuids.has(c.serial_id));
+  const displayCards = tab === 'possedute' ? ownedCards : missingCards;
 
-  const filtered = userCards.filter(uc =>
-    (!rarityFilter || uc.cards?.rarity === rarityFilter) &&
-    (!versionFilter || uc.cards?.version === versionFilter) &&
-    (!setFilter || uc.cards?.set === setFilter)
+  const rarities = Array.from(new Set(displayCards.map(c => c.rarity).filter(Boolean)));
+  const versions = Array.from(new Set(displayCards.map(c => c.version).filter(Boolean)));
+  const sets = Array.from(new Set(displayCards.map(c => c.set).filter(Boolean)));
+
+  const filtered = displayCards.filter(c =>
+    (!rarityFilter || c.rarity === rarityFilter) &&
+    (!versionFilter || c.version === versionFilter) &&
+    (!setFilter || c.set === setFilter)
   );
+
+  const resetFilters = () => {
+    setRarityFilter('');
+    setVersionFilter('');
+    setSetFilter('');
+  };
+
+  const tabClass = (t: Tab) =>
+    `px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${
+      tab === t
+        ? 'border-orange-500 text-orange-600 bg-white'
+        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 bg-gray-100'
+    }`;
 
   return (
     <div className="p-4">
-      <h2 className="text-2xl font-bold mb-4">Le tue carte</h2>
+      <h2 className="text-2xl font-bold mb-3">La tua collezione</h2>
+
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-gray-200 mb-4">
+        <button className={tabClass('possedute')} onClick={() => { setTab('possedute'); resetFilters(); }}>
+          ✅ Carte possedute
+          {!loading && <span className="ml-1 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">{ownedCards.length}</span>}
+        </button>
+        <button className={tabClass('mancanti')} onClick={() => { setTab('mancanti'); resetFilters(); }}>
+          ❌ Carte mancanti
+          {!loading && <span className="ml-1 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">{missingCards.length}</span>}
+        </button>
+      </div>
+
+      {/* Statistiche */}
+      {!loading && (
+        <div className="flex gap-4 mb-4 text-xs text-gray-500">
+          <span>Totale: <strong className="text-gray-700">{allCards.length}</strong></span>
+          <span>Possedute: <strong className="text-green-600">{ownedCards.length}</strong></span>
+          <span>Mancanti: <strong className="text-red-500">{missingCards.length}</strong></span>
+          <span>Completamento: <strong className="text-orange-600">
+            {allCards.length > 0 ? Math.round((ownedCards.length / allCards.length) * 100) : 0}%
+          </strong></span>
+        </div>
+      )}
+
+      {/* Filtri */}
       <div className="flex flex-wrap gap-4 mb-4 items-center">
         <label className="text-sm">
           Rarità:
@@ -79,39 +135,49 @@ function CardList() {
             {sets.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </label>
-        <span className="ml-auto text-xs text-gray-500">{filtered.length} carta{filtered.length !== 1 ? 'e' : ''}</span>
+        <span className="ml-auto text-xs text-gray-500">{filtered.length} {tab === 'possedute' ? 'possedute' : 'mancanti'}</span>
       </div>
+
       {loading && <div>Caricamento carte...</div>}
       {error && <div className="text-red-600">{error}</div>}
       {!loading && !error && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {filtered.length === 0 && (
             <div className="col-span-full text-gray-500">
-              {userCards.length === 0 ? 'Nessuna carta posseduta.' : 'Nessuna carta corrisponde ai filtri.'}
+              {tab === 'possedute'
+                ? (ownedCards.length === 0 ? 'Nessuna carta posseduta.' : 'Nessuna carta corrisponde ai filtri.')
+                : (missingCards.length === 0 ? '🎉 Collezione completa!' : 'Nessuna carta corrisponde ai filtri.')}
             </div>
           )}
-          {filtered.map((uc) => (
-            <article key={uc.card_uuid} className="border-2 border-green-500 rounded-lg p-3 bg-white flex flex-col items-center">
+          {filtered.map(card => (
+            <article
+              key={card.serial_id}
+              className={`border-2 rounded-lg p-3 bg-white flex flex-col items-center ${
+                tab === 'possedute' ? 'border-green-500' : 'border-red-300 opacity-80'
+              }`}
+            >
               <div className="flex items-center w-full mb-1">
-                <span className="text-xs text-gray-500">#{uc.cards?.id ?? '-'}</span>
-                {uc.cards?.version && (
+                <span className="text-xs text-gray-500">#{card.id}</span>
+                {card.version && (
                   <span className="ml-auto text-xs font-medium px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
-                    {uc.cards.version}
+                    {card.version}
                   </span>
                 )}
-                <button
-                  onClick={() => handleRemove(uc.card_uuid)}
-                  className="ml-2 text-red-400 hover:text-red-600 text-xs"
-                  title="Rimuovi dalla collezione"
-                >🗑</button>
+                {tab === 'possedute' && (
+                  <button
+                    onClick={() => handleRemove(card.serial_id)}
+                    className="ml-2 text-red-400 hover:text-red-600 text-xs"
+                    title="Rimuovi dalla collezione"
+                  >🗑</button>
+                )}
               </div>
-              <h3 className="font-semibold text-sm mb-2 text-center">{uc.cards?.name ?? 'Carta non trovata'}</h3>
-              {uc.cards?.image_url ? (
-                <a href={uc.cards.image_url} target="_blank" rel="noopener noreferrer" className="block w-full">
+              <h3 className="font-semibold text-sm mb-2 text-center">{card.name}</h3>
+              {card.image_url ? (
+                <a href={card.image_url} target="_blank" rel="noopener noreferrer" className="block w-full">
                   <img
-                    src={uc.cards.image_url}
-                    alt={`Carta ${uc.cards.id} - ${uc.cards.name}`}
-                    className="w-auto h-64 mx-auto rounded mb-2 bg-gray-100 object-contain"
+                    src={card.image_url}
+                    alt={`Carta ${card.id} - ${card.name}`}
+                    className={`w-auto h-64 mx-auto rounded mb-2 bg-gray-100 object-contain ${tab === 'mancanti' ? 'grayscale' : ''}`}
                     style={{ maxHeight: 260, maxWidth: '100%' }}
                     loading="lazy"
                   />
@@ -121,9 +187,9 @@ function CardList() {
                   Immagine non disponibile
                 </div>
               )}
-              <div className="text-xs text-gray-700">Rarità: <strong>{uc.cards?.rarity ?? '-'}</strong></div>
-              <div className="text-xs text-gray-700">Tipo: <strong>{uc.cards?.type ?? '-'}</strong></div>
-              <div className="text-xs text-gray-700">Set: <strong>{uc.cards?.set ?? '-'}</strong></div>
+              <div className="text-xs text-gray-700">Rarità: <strong>{card.rarity}</strong></div>
+              <div className="text-xs text-gray-700">Tipo: <strong>{card.type}</strong></div>
+              <div className="text-xs text-gray-700">Set: <strong>{card.set}</strong></div>
             </article>
           ))}
         </div>
