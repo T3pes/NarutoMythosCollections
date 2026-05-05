@@ -108,41 +108,38 @@ function Dashboard() {
     if (!user) return;
     setSaveStatus('saving');
     try {
-      const toSave: { user_id: string; card_uuid: string; version: string }[] = [];
+      const toAdd: { user_id: string; card_uuid: string; version: string }[] = [];
+
       selectedCards.forEach(groupKey => {
         const group = groupedCards.find(g => g.key === groupKey);
         if (!group) return;
         if (showVersions(group.card.rarity)) {
-          // C/UC: salva le versioni selezionate in basso
+          // C/UC: aggiunge solo le versioni selezionate non ancora presenti
           (selectedVersions[groupKey] || []).forEach(version => {
             const serialId = group.versions[version];
-            if (serialId) toSave.push({ user_id: user.id, card_uuid: serialId, version });
+            if (serialId && !userCards.some(uc => uc.card_uuid === serialId && uc.version === version)) {
+              toAdd.push({ user_id: user.id, card_uuid: serialId, version });
+            }
           });
         } else {
-          // Altre carte: salva il serial_id con la versione della carta
+          // Altre carte: aggiunge solo se non già presente
           const serialId = group.card.serial_id;
-          if (serialId) toSave.push({ user_id: user.id, card_uuid: serialId, version: group.card.version ?? 'normale' });
+          const version = group.card.version ?? 'normale';
+          if (serialId && !userCards.some(uc => uc.card_uuid === serialId && uc.version === version)) {
+            toAdd.push({ user_id: user.id, card_uuid: serialId, version });
+          }
         }
       });
 
-      const { error: delError } = await supabase.from('user_cards').delete().eq('user_id', user.id);
-      if (delError) {
-        console.error('Errore eliminazione:', delError);
-        setSaveStatus('error');
-        setTimeout(() => setSaveStatus('idle'), 3000);
-        return;
-      }
-      if (toSave.length > 0) {
-        const { error: insError } = await supabase.from('user_cards').insert(toSave);
+      if (toAdd.length > 0) {
+        const { error: insError } = await supabase.from('user_cards').insert(toAdd);
         if (insError) {
           console.error('Errore inserimento:', insError);
           setSaveStatus('error');
           setTimeout(() => setSaveStatus('idle'), 3000);
           return;
         }
-        setUserCards(toSave);
-      } else {
-        setUserCards([]);
+        setUserCards(prev => [...prev, ...toAdd]);
       }
       setSaveStatus('ok');
       setTimeout(() => setSaveStatus('idle'), 2000);
