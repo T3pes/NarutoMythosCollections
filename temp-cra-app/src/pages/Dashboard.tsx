@@ -9,8 +9,8 @@ function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rarityFilter, setRarityFilter] = useState<string>('');
-  // Selezione univoca tramite card_uuid (una sola checkbox per carta)
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'ok' | 'error'>('idle');
 
   useEffect(() => {
     async function loadAll() {
@@ -58,17 +58,42 @@ function Dashboard() {
   // Salva la selezione: salva tutte le carte selezionate (serial_id/version)
   const handleSaveSelection = async () => {
     if (!user) return;
-    // Trova le carte selezionate tra TUTTE le carte (non solo quelle filtrate)
-    const toSave = cards.filter(card => selectedCards.includes(card.serial_id))
-      .map(card => ({ user_id: user.id, card_uuid: card.serial_id, version: card.version }));
-    // Rimuovi tutte le user_cards dell'utente
-    await supabase.from('user_cards').delete().eq('user_id', user.id);
-    // Inserisci solo quelle selezionate
-    if (toSave.length > 0) {
-      await supabase.from('user_cards').insert(toSave);
-      setUserCards(toSave);
-    } else {
-      setUserCards([]);
+    setSaveStatus('saving');
+    try {
+      // Trova le carte selezionate tra TUTTE le carte (non solo quelle filtrate)
+      // Filtra anche quelle con serial_id valido
+      const toSave = cards
+        .filter(card => card.serial_id && selectedCards.includes(card.serial_id))
+        .map(card => ({ user_id: user.id, card_uuid: card.serial_id, version: card.version }));
+
+      // Rimuovi tutte le user_cards dell'utente
+      const { error: delError } = await supabase.from('user_cards').delete().eq('user_id', user.id);
+      if (delError) {
+        console.error('Errore eliminazione:', delError);
+        setSaveStatus('error');
+        setTimeout(() => setSaveStatus('idle'), 3000);
+        return;
+      }
+
+      // Inserisci solo quelle selezionate
+      if (toSave.length > 0) {
+        const { error: insError } = await supabase.from('user_cards').insert(toSave);
+        if (insError) {
+          console.error('Errore inserimento:', insError);
+          setSaveStatus('error');
+          setTimeout(() => setSaveStatus('idle'), 3000);
+          return;
+        }
+        setUserCards(toSave);
+      } else {
+        setUserCards([]);
+      }
+      setSaveStatus('ok');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch (e) {
+      console.error('Errore salvataggio:', e);
+      setSaveStatus('error');
+      setTimeout(() => setSaveStatus('idle'), 3000);
     }
   };
 
@@ -102,10 +127,12 @@ function Dashboard() {
           {selectedCards.length === filteredCards.length && filteredCards.length > 0 ? 'Deseleziona tutti' : 'Seleziona tutti'}
         </button>
         <button
-          className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 border border-blue-300"
+          className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 border border-blue-300 disabled:opacity-50"
           onClick={handleSaveSelection}
-          disabled={!user || selectedCards.length === 0}
-        >Salva selezione</button>
+          disabled={!user || selectedCards.length === 0 || saveStatus === 'saving'}
+        >
+          {saveStatus === 'saving' ? 'Salvataggio...' : saveStatus === 'ok' ? '✓ Salvato!' : saveStatus === 'error' ? '✗ Errore' : 'Salva selezione'}
+        </button>
       </div>
       {loading && <div>Caricamento carte...</div>}
       {error && <div className="text-red-600">{error}</div>}
