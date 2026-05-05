@@ -113,7 +113,7 @@ function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           {filteredCards.length === 0 && <div className="col-span-full text-gray-500">Nessuna carta trovata.</div>}
           {filteredCards.map(card => (
-            <article key={card.id} className={`border rounded-lg p-3 bg-white flex flex-col items-center`}>
+            <article key={card.serial_id} className={`border rounded-lg p-3 bg-white flex flex-col items-center`}>
               <div className="flex items-center w-full justify-between mb-1">
                 {/* Checkbox di selezione per ogni riga (serial_id) */}
                 <label className="flex items-center gap-1">
