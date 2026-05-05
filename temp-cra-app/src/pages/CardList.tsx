@@ -16,15 +16,14 @@ function CardList() {
       setLoading(true);
       setError(null);
       if (!user) { setUserCards([]); setLoading(false); return; }
-      // user_cards.card_uuid → cards.serial_id (nuovo schema)
       const { data, error: err } = await supabase
         .from('user_cards')
-        .select('card_uuid, version, cards:card_uuid(serial_id, id, name, image_url, rarity, type, version, set)')
+        .select('card_uuid, cards:card_uuid(serial_id, id, name, image_url, rarity, type, version, set)')
         .eq('user_id', user.id);
       if (err) { setError('Errore nel caricamento delle carte utente'); setLoading(false); return; }
       const normalized = (data ?? []).map((uc: any) => ({
         ...uc,
-        cards: Array.isArray(uc.cards) ? uc.cards[0] : uc.cards
+        cards: Array.isArray(uc.cards) ? uc.cards[0] : uc.cards,
       }));
       setUserCards(normalized);
       setLoading(false);
@@ -32,27 +31,26 @@ function CardList() {
     loadUserCards();
   }, [user]);
 
-  const handleRemove = async (cardUuid: string, version: string) => {
+  const handleRemove = async (cardUuid: string) => {
     if (!user) return;
     const { error: err } = await supabase
       .from('user_cards')
       .delete()
-      .match({ user_id: user.id, card_uuid: cardUuid, version });
+      .match({ user_id: user.id, card_uuid: cardUuid });
     if (!err) {
-      setUserCards(prev => prev.filter(uc => !(uc.card_uuid === cardUuid && uc.version === version)));
+      setUserCards(prev => prev.filter(uc => uc.card_uuid !== cardUuid));
     } else {
       console.error('Errore rimozione:', err);
     }
   };
 
-  // Valori unici per i filtri
   const rarities = Array.from(new Set(userCards.map(uc => uc.cards?.rarity).filter(Boolean)));
-  const versions = Array.from(new Set(userCards.map(uc => uc.version).filter(Boolean)));
+  const versions = Array.from(new Set(userCards.map(uc => uc.cards?.version).filter(Boolean)));
   const sets = Array.from(new Set(userCards.map(uc => uc.cards?.set).filter(Boolean)));
 
   const filtered = userCards.filter(uc =>
     (!rarityFilter || uc.cards?.rarity === rarityFilter) &&
-    (!versionFilter || uc.version === versionFilter) &&
+    (!versionFilter || uc.cards?.version === versionFilter) &&
     (!setFilter || uc.cards?.set === setFilter)
   );
 
@@ -93,12 +91,16 @@ function CardList() {
             </div>
           )}
           {filtered.map((uc) => (
-            <article key={`${uc.card_uuid}-${uc.version}`} className="border rounded-lg p-3 bg-white flex flex-col items-center">
+            <article key={uc.card_uuid} className="border-2 border-green-500 rounded-lg p-3 bg-white flex flex-col items-center">
               <div className="flex items-center w-full mb-1">
                 <span className="text-xs text-gray-500">#{uc.cards?.id ?? '-'}</span>
-                <span className="ml-auto text-xs font-medium px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">{uc.version}</span>
+                {uc.cards?.version && (
+                  <span className="ml-auto text-xs font-medium px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
+                    {uc.cards.version}
+                  </span>
+                )}
                 <button
-                  onClick={() => handleRemove(uc.card_uuid, uc.version)}
+                  onClick={() => handleRemove(uc.card_uuid)}
                   className="ml-2 text-red-400 hover:text-red-600 text-xs"
                   title="Rimuovi dalla collezione"
                 >🗑</button>

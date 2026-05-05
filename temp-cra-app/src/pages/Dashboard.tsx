@@ -2,32 +2,15 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../auth/AuthContext';
 
-const VERSIONS = ['normale', 'fullart', 'holo'];
-
-const showVersions = (rarity: string) =>
-  rarity === 'C' || rarity === 'UC' || rarity === 'Common' || rarity === 'Uncommon';
-
-// Chiave univoca: per C/UC raggruppa per id+nome, per le altre usa serial_id (con fallback robusto)
-const getGroupKey = (card: any): string =>
-  showVersions(card.rarity)
-    ? String(card.id) + '-' + card.name
-    : (card.serial_id ?? String(card.id) + '-' + card.name + '-' + (card.rarity ?? '') + '-' + (card.version ?? ''));
-
-interface CardGroup {
-  key: string;
-  card: any;
-  versions: { [version: string]: string }; // version → serial_id
-}
-
 function Dashboard() {
   const { user } = useAuth();
   const [cards, setCards] = useState<any[]>([]);
-  const [userCards, setUserCards] = useState<{ card_uuid: string; version: string }[]>([]);
+  const [userCardUuids, setUserCardUuids] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rarityFilter, setRarityFilter] = useState<string>('');
+  const [versionFilter, setVersionFilter] = useState<string>('');
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
-  const [selectedVersions, setSelectedVersions] = useState<{ [groupKey: string]: string[] }>({});
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'ok' | 'error'>('idle');
 
   useEffect(() => {
@@ -38,117 +21,52 @@ function Dashboard() {
         .from('cards').select('*').order('id', { ascending: true });
       if (err1) { setError('Errore nel caricamento delle carte'); setLoading(false); return; }
       setCards(allCards ?? []);
-      if (!user) {
-        setUserCards([]);
-        setLoading(false);
-        return;
-      }
+      if (!user) { setLoading(false); return; }
       const { data: uc } = await supabase
-        .from('user_cards').select('card_uuid, version').eq('user_id', user.id);
-      setUserCards(uc ?? []);
+        .from('user_cards').select('card_uuid').eq('user_id', user.id);
+      setUserCardUuids(new Set((uc ?? []).map((r: any) => r.card_uuid)));
       setLoading(false);
     }
     loadAll();
   }, [user]);
 
+  const rarities = Array.from(new Set(cards.map(c => c.rarity).filter(Boolean)));
+  const versions = Array.from(new Set(cards.map(c => c.version).filter(Boolean)));
 
-  // Pre-popola selectedVersions dai dati salvati (ma NON selectedCards: le carte non appaiono pre-selezionate)
-  useEffect(() => {
-    if (cards.length === 0) return;
-    const newVersions: { [groupKey: string]: string[] } = {};
-    userCards.forEach(uc => {
-      const card = cards.find(c => c.serial_id === uc.card_uuid);
-      if (!card) return;
-      const groupKey = getGroupKey(card);
-      if (!newVersions[groupKey]) newVersions[groupKey] = [];
-      if (!newVersions[groupKey].includes(uc.version)) newVersions[groupKey].push(uc.version);
-    });
-    setSelectedVersions(newVersions);
-  }, [userCards, cards]);
-
-  const filteredCards = rarityFilter ? cards.filter(c => c.rarity === rarityFilter) : cards;
-
-  // Chiavi dei gruppi presenti nella collezione (bordo verde)
-  const savedCardKeys = new Set(
-    userCards.map(uc => {
-      const card = cards.find(c => c.serial_id === uc.card_uuid);
-      return card ? getGroupKey(card) : null;
-    }).filter(Boolean) as string[]
+  const filteredCards = cards.filter(c =>
+    (!rarityFilter || c.rarity === rarityFilter) &&
+    (!versionFilter || c.version === versionFilter)
   );
 
-  // Raggruppa: C/UC per id+nome, altre per serial_id
-  const groupedCards: CardGroup[] = (() => {
-    const groups: { [key: string]: CardGroup } = {};
-    filteredCards.forEach(card => {
-      const key = getGroupKey(card);
-      if (!groups[key]) groups[key] = { key, card, versions: {} };
-      if (card.version && card.serial_id) groups[key].versions[card.version] = card.serial_id;
-    });
-    return Object.values(groups);
-  })();
-
   const handleSelectAll = () => {
-    const currentKeys = groupedCards.map(g => g.key);
-    const allCurrentSelected = currentKeys.every(k => selectedCards.includes(k));
-    if (allCurrentSelected && currentKeys.length > 0) {
-      // Deseleziona solo le carte visibili, mantieni le altre
-      setSelectedCards(prev => prev.filter(k => !currentKeys.includes(k)));
+    const currentIds = filteredCards.map(c => c.serial_id).filter(Boolean);
+    const allSelected = currentIds.every(id => selectedCards.includes(id)) && currentIds.length > 0;
+    if (allSelected) {
+      setSelectedCards(prev => prev.filter(id => !currentIds.includes(id)));
     } else {
-      // Aggiunge le carte visibili a quelle già selezionate (accumula tra filtri)
-      setSelectedCards(prev => Array.from(new Set([...prev, ...currentKeys])));
+      setSelectedCards(prev => Array.from(new Set([...prev, ...currentIds])));
     }
   };
 
-  const handleSelectCard = (groupKey: string) => {
+  const handleSelectCard = (serialId: string) => {
     setSelectedCards(prev =>
-      prev.includes(groupKey) ? prev.filter(k => k !== groupKey) : [...prev, groupKey]
+      prev.includes(serialId) ? prev.filter(id => id !== serialId) : [...prev, serialId]
     );
-  };
-
-  const handleVersionToggle = (groupKey: string, version: string) => {
-    setSelectedVersions(prev => {
-      const versions = prev[groupKey] || [];
-      return versions.includes(version)
-        ? { ...prev, [groupKey]: versions.filter(v => v !== version) }
-        : { ...prev, [groupKey]: [...versions, version] };
-    });
   };
 
   const handleSaveSelection = async () => {
     if (!user) return;
     setSaveStatus('saving');
     try {
-      // Costruisce i gruppi da TUTTE le carte (ignora il filtro attivo)
-      const allGroups: { [key: string]: CardGroup } = {};
-      cards.forEach(card => {
-        const key = getGroupKey(card);
-        if (!allGroups[key]) allGroups[key] = { key, card, versions: {} };
-        if (card.version && card.serial_id) allGroups[key].versions[card.version] = card.serial_id;
-      });
-
-      const toAdd: { user_id: string; card_uuid: string; version: string }[] = [];
-
-      selectedCards.forEach(groupKey => {
-        const group = allGroups[groupKey];
-        if (!group) return;
-        if (showVersions(group.card.rarity)) {
-          // C/UC: aggiunge solo le versioni selezionate non ancora presenti
-          // Usa il serial_id specifico per la versione, o in fallback quello della carta rappresentante
-          (selectedVersions[groupKey] || []).forEach(version => {
-            const serialId = group.versions[version] ?? group.card.serial_id;
-            if (serialId && !userCards.some(uc => uc.card_uuid === serialId && uc.version === version)) {
-              toAdd.push({ user_id: user.id, card_uuid: serialId, version });
-            }
-          });
-        } else {
-          // Altre carte: aggiunge solo se non già presente
-          const serialId = group.card.serial_id;
-          const version = group.card.version ?? 'normale';
-          if (serialId && !userCards.some(uc => uc.card_uuid === serialId && uc.version === version)) {
-            toAdd.push({ user_id: user.id, card_uuid: serialId, version });
-          }
-        }
-      });
+      const toAdd = selectedCards
+        .map(serialId => cards.find(c => c.serial_id === serialId))
+        .filter(Boolean)
+        .filter(card => !userCardUuids.has(card.serial_id))
+        .map(card => ({
+          user_id: user.id,
+          card_uuid: card.serial_id,
+          version: card.version ?? 'normale',
+        }));
 
       if (toAdd.length > 0) {
         const { error: insError } = await supabase.from('user_cards').insert(toAdd);
@@ -158,7 +76,7 @@ function Dashboard() {
           setTimeout(() => setSaveStatus('idle'), 3000);
           return;
         }
-        setUserCards(prev => [...prev, ...toAdd]);
+        setUserCardUuids(prev => new Set([...Array.from(prev), ...toAdd.map(r => r.card_uuid)]));
       }
       setSaveStatus('ok');
       setTimeout(() => setSaveStatus('idle'), 2000);
@@ -169,21 +87,33 @@ function Dashboard() {
     }
   };
 
+  const allVisibleSelected =
+    filteredCards.length > 0 &&
+    filteredCards.every(c => selectedCards.includes(c.serial_id));
+
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Tutte le carte</h1>
       <div className="flex flex-wrap gap-4 mb-4 items-center">
         <label className="text-sm">
-          Filtra per rarità:
+          Rarità:
           <select className="ml-2 border rounded px-2 py-1 text-sm" value={rarityFilter} onChange={e => setRarityFilter(e.target.value)}>
             <option value="">Tutte</option>
-            {Array.from(new Set(cards.map(card => card.rarity))).filter(Boolean).map(r => (
-              <option key={r} value={r}>{r}</option>
-            ))}
+            {rarities.map(r => <option key={r} value={r}>{r}</option>)}
           </select>
         </label>
-        <button className="ml-4 px-2 py-1 text-xs bg-orange-600 text-white rounded hover:bg-orange-700 border border-orange-300" onClick={handleSelectAll}>
-          {groupedCards.every(g => selectedCards.includes(g.key)) && groupedCards.length > 0 ? 'Deseleziona visibili' : 'Seleziona visibili'}
+        <label className="text-sm">
+          Versione:
+          <select className="ml-2 border rounded px-2 py-1 text-sm" value={versionFilter} onChange={e => setVersionFilter(e.target.value)}>
+            <option value="">Tutte</option>
+            {versions.map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+        </label>
+        <button
+          className="ml-2 px-2 py-1 text-xs bg-orange-600 text-white rounded hover:bg-orange-700 border border-orange-300"
+          onClick={handleSelectAll}
+        >
+          {allVisibleSelected ? 'Deseleziona visibili' : 'Seleziona visibili'}
         </button>
         <button
           className="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 border border-blue-300 disabled:opacity-50"
@@ -192,31 +122,44 @@ function Dashboard() {
         >
           {saveStatus === 'saving' ? 'Salvataggio...' : saveStatus === 'ok' ? '✓ Salvato!' : saveStatus === 'error' ? '✗ Errore' : 'Salva selezione'}
         </button>
+        <span className="ml-auto text-xs text-gray-500">{filteredCards.length} carte · {selectedCards.length} selezionate</span>
       </div>
       {loading && <div>Caricamento carte...</div>}
       {error && <div className="text-red-600">{error}</div>}
       {!loading && !error && (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {groupedCards.length === 0 && <div className="col-span-full text-gray-500">Nessuna carta trovata.</div>}
-          {groupedCards.map(({ key, card }) => (
-            <article key={key} className={`border-2 rounded-lg p-3 bg-white flex flex-col items-center ${savedCardKeys.has(key) ? 'border-green-500' : 'border-gray-200'}`}>
+          {filteredCards.length === 0 && <div className="col-span-full text-gray-500">Nessuna carta trovata.</div>}
+          {filteredCards.map(card => (
+            <article
+              key={card.serial_id}
+              className={`border-2 rounded-lg p-3 bg-white flex flex-col items-center ${userCardUuids.has(card.serial_id) ? 'border-green-500' : 'border-gray-200'}`}
+            >
               <div className="flex items-center w-full mb-1">
-                <label className="flex items-center gap-1">
+                <label className="flex items-center gap-1 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={selectedCards.includes(key)}
-                    onChange={() => handleSelectCard(key)}
+                    checked={selectedCards.includes(card.serial_id)}
+                    onChange={() => handleSelectCard(card.serial_id)}
                     className="accent-orange-600"
                   />
                   <span className="text-xs text-gray-500">#{card.id}</span>
                 </label>
+                {card.version && (
+                  <span className="ml-auto text-xs font-medium px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
+                    {card.version}
+                  </span>
+                )}
               </div>
               <h3 className="font-semibold text-sm mb-2 text-center">{card.name}</h3>
               {card.image_url ? (
                 <a href={card.image_url} target="_blank" rel="noopener noreferrer" className="block w-full">
-                  <img src={card.image_url} alt={`Carta ${card.id} - ${card.name}`}
+                  <img
+                    src={card.image_url}
+                    alt={`Carta ${card.id} - ${card.name}`}
                     className="w-auto h-64 mx-auto rounded mb-2 bg-gray-100 object-contain"
-                    style={{ maxHeight: 260, maxWidth: '100%' }} loading="lazy" />
+                    style={{ maxHeight: 260, maxWidth: '100%' }}
+                    loading="lazy"
+                  />
                 </a>
               ) : (
                 <div className="w-full h-64 rounded mb-2 bg-gray-100 flex items-center justify-center text-xs text-gray-500">
@@ -225,25 +168,7 @@ function Dashboard() {
               )}
               <div className="text-xs text-gray-700">Rarità: <strong>{card.rarity}</strong></div>
               <div className="text-xs text-gray-700">Tipo: <strong>{card.type}</strong></div>
-              {!showVersions(card.rarity) && (
-                <div className="text-xs text-gray-700">Versione: <strong>{card.version}</strong></div>
-              )}
               <div className="text-xs text-gray-700">Set: <strong>{card.set}</strong></div>
-              {showVersions(card.rarity) && (
-                <div className="mt-2 flex gap-2">
-                  {VERSIONS.map(v => (
-                    <label key={v} className={`flex items-center gap-1 text-xs ${!selectedCards.includes(key) ? 'opacity-40' : ''}`}>
-                      <input
-                        type="checkbox"
-                        checked={(selectedVersions[key] || []).includes(v)}
-                        onChange={() => handleVersionToggle(key, v)}
-                        disabled={!selectedCards.includes(key)}
-                      />
-                      {v}
-                    </label>
-                  ))}
-                </div>
-              )}
             </article>
           ))}
         </div>
