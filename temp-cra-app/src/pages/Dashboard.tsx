@@ -4,6 +4,13 @@ import { useAuth } from '../auth/AuthContext';
 
 const VERSIONS = ['normale', 'fullart', 'holo'];
 
+const showVersions = (rarity: string) =>
+  rarity === 'C' || rarity === 'UC' || rarity === 'Common' || rarity === 'Uncommon';
+
+// Chiave univoca: per C/UC raggruppa per id+nome, per le altre usa serial_id (evita duplicati)
+const getGroupKey = (card: any): string =>
+  showVersions(card.rarity) ? String(card.id) + '-' + card.name : card.serial_id;
+
 interface CardGroup {
   key: string;
   card: any;
@@ -42,12 +49,6 @@ function Dashboard() {
     loadAll();
   }, [user]);
 
-  const showVersions = (rarity: string) =>
-    rarity === 'C' || rarity === 'UC' || rarity === 'Common' || rarity === 'Uncommon';
-
-  // Chiave univoca: per C/UC raggruppa per id+nome (versioni multiple), per le altre usa serial_id
-  const getGroupKey = (card: any): string =>
-    showVersions(card.rarity) ? String(card.id) + '-' + card.name : card.serial_id;
 
   // Pre-popola selectedVersions dai dati salvati (ma NON selectedCards: le carte non appaiono pre-selezionate)
   useEffect(() => {
