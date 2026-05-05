@@ -32,6 +32,19 @@ function CardList() {
     loadUserCards();
   }, [user]);
 
+  const handleRemove = async (cardUuid: string, version: string) => {
+    if (!user) return;
+    const { error: err } = await supabase
+      .from('user_cards')
+      .delete()
+      .match({ user_id: user.id, card_uuid: cardUuid, version });
+    if (!err) {
+      setUserCards(prev => prev.filter(uc => !(uc.card_uuid === cardUuid && uc.version === version)));
+    } else {
+      console.error('Errore rimozione:', err);
+    }
+  };
+
   // Valori unici per i filtri
   const rarities = Array.from(new Set(userCards.map(uc => uc.cards?.rarity).filter(Boolean)));
   const versions = Array.from(new Set(userCards.map(uc => uc.version).filter(Boolean)));
@@ -84,6 +97,11 @@ function CardList() {
               <div className="flex items-center w-full mb-1">
                 <span className="text-xs text-gray-500">#{uc.cards?.id ?? '-'}</span>
                 <span className="ml-auto text-xs font-medium px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">{uc.version}</span>
+                <button
+                  onClick={() => handleRemove(uc.card_uuid, uc.version)}
+                  className="ml-2 text-red-400 hover:text-red-600 text-xs"
+                  title="Rimuovi dalla collezione"
+                >🗑</button>
               </div>
               <h3 className="font-semibold text-sm mb-2 text-center">{uc.cards?.name ?? 'Carta non trovata'}</h3>
               {uc.cards?.image_url ? (
