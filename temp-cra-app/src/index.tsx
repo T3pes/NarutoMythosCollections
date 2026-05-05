@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import './index.css';
 import App from './App';
 import { AuthProvider } from './auth/AuthContext';
+import { CollectionProvider } from './CollectionContext';
 import reportWebVitals from './reportWebVitals';
 import { BrowserRouter } from 'react-router-dom';
 
@@ -13,7 +14,9 @@ root.render(
   <React.StrictMode>
     <BrowserRouter>
       <AuthProvider>
-        <App />
+        <CollectionProvider>
+          <App />
+        </CollectionProvider>
       </AuthProvider>
     </BrowserRouter>
   </React.StrictMode>
