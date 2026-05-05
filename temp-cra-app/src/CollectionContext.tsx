@@ -1,13 +1,12 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import narutoMythosLogo from './images/naruto-mythos-logo.webp';
 
 export interface Collection {
   id: string;
   name: string;
   description: string;
-  logo: string;       // path pubblico (es. /images/naruto-mythos-logo.webp)
-  accentColor: string; // classe Tailwind per colore tematico
-  setName: string;    // valore usato nel campo "set" del DB (se si filtra per set)
+  logo: string;
+  accentColor: string;
+  setName: string;
 }
 
 // Registro statico di tutte le collezioni disponibili
@@ -16,9 +15,9 @@ export const COLLECTIONS: Collection[] = [
     id: 'naruto-mythos',
     name: 'Naruto Mythos',
     description: 'Trading Card Game ufficiale basato sul manga Naruto',
-    logo: narutoMythosLogo,
+    logo: 'https://capsulecorpgear.com/wp-content/uploads/Naruto_TCG_Card_Back-0dcade80-640w.webp',
     accentColor: 'orange',
-    setName: '',  // vuoto = tutte le carte nel DB (per ora solo Naruto Mythos)
+    setName: '',
   },
 ];
 
