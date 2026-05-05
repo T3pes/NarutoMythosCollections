@@ -108,10 +108,18 @@ function Dashboard() {
     if (!user) return;
     setSaveStatus('saving');
     try {
+      // Costruisce i gruppi da TUTTE le carte (ignora il filtro attivo)
+      const allGroups: { [key: string]: CardGroup } = {};
+      cards.forEach(card => {
+        const key = String(card.id) + '-' + card.name;
+        if (!allGroups[key]) allGroups[key] = { key, card, versions: {} };
+        if (card.version && card.serial_id) allGroups[key].versions[card.version] = card.serial_id;
+      });
+
       const toAdd: { user_id: string; card_uuid: string; version: string }[] = [];
 
       selectedCards.forEach(groupKey => {
-        const group = groupedCards.find(g => g.key === groupKey);
+        const group = allGroups[groupKey];
         if (!group) return;
         if (showVersions(group.card.rarity)) {
           // C/UC: aggiunge solo le versioni selezionate non ancora presenti
