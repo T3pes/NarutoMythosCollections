@@ -14,7 +14,7 @@ function Dashboard() {
   // Selezione univoca tramite card_uuid (una sola checkbox per carta)
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   // Stato delle versioni selezionate per ogni carta (checkbox in basso)
-  const [selectedVersions, setSelectedVersions] = useState<{ [cardUuid: string]: string[] }>({});
+  const [selectedVersions, setSelectedVersions] = useState<{ [serialId: string]: string[] }>({});
 
   useEffect(() => {
     async function loadAll() {
@@ -45,7 +45,7 @@ function Dashboard() {
 
   useEffect(() => {
     // Pre-seleziona le versioni possedute per ogni carta selezionata
-    const versionsMap: { [cardUuid: string]: string[] } = {};
+    const versionsMap: { [serialId: string]: string[] } = {};
     userCards.forEach(uc => {
       if (!versionsMap[uc.card_uuid]) versionsMap[uc.card_uuid] = [];
       versionsMap[uc.card_uuid].push(uc.version);
@@ -62,25 +62,25 @@ function Dashboard() {
     if (selectedCards.length === filteredCards.length) {
       setSelectedCards([]);
     } else {
-      setSelectedCards(filteredCards.map(card => card.card_uuid));
+      setSelectedCards(filteredCards.map(card => card.serial_id));
     }
   }
 
   // Seleziona/deseleziona una singola carta
-  const handleSelectCard = (cardUuid: string) => {
+  const handleSelectCard = (serialId: string) => {
     setSelectedCards((prev) =>
-      prev.includes(cardUuid) ? prev.filter((id) => id !== cardUuid) : [...prev, cardUuid]
+      prev.includes(serialId) ? prev.filter((id) => id !== serialId) : [...prev, serialId]
     );
   }
 
   // Aggiorna la selezione delle versioni per una carta
-  const handleVersionToggle = (cardUuid: string, version: string) => {
+  const handleVersionToggle = (serialId: string, version: string) => {
     setSelectedVersions(prev => {
-      const versions = prev[cardUuid] || [];
+      const versions = prev[serialId] || [];
       if (versions.includes(version)) {
-        return { ...prev, [cardUuid]: versions.filter(v => v !== version) };
+        return { ...prev, [serialId]: versions.filter(v => v !== version) };
       } else {
-        return { ...prev, [cardUuid]: [...versions, version] };
+        return { ...prev, [serialId]: [...versions, version] };
       }
     });
   };
@@ -89,8 +89,8 @@ function Dashboard() {
   const handleSaveSelection = async () => {
     if (!user) return;
     // Costruisci la lista completa delle coppie carta+versione da salvare
-    const toSave = selectedCards.flatMap(cardUuid =>
-      (selectedVersions[cardUuid] || []).map(version => ({ user_id: user.id, card_uuid: cardUuid, version }))
+    const toSave = selectedCards.flatMap(serialId =>
+      (selectedVersions[serialId] || []).map(version => ({ user_id: user.id, card_uuid: serialId, version }))
     );
     // Rimuovi tutte le user_cards dell'utente
     await supabase.from('user_cards').delete().eq('user_id', user.id);
@@ -154,8 +154,8 @@ function Dashboard() {
                 <label className="flex items-center gap-1">
                   <input
                     type="checkbox"
-                    checked={selectedCards.includes(card.card_uuid)}
-                    onChange={() => handleSelectCard(card.card_uuid)}
+                    checked={selectedCards.includes(card.serial_id)}
+                    onChange={() => handleSelectCard(card.serial_id)}
                     className="accent-orange-600"
                   />
                   <span className="text-xs text-gray-500">#{card.id}</span>
@@ -187,9 +187,9 @@ function Dashboard() {
                     <label key={v} className="flex items-center gap-1 text-xs">
                       <input
                         type="checkbox"
-                        checked={(selectedVersions[card.card_uuid] || []).includes(v)}
-                        onChange={() => handleVersionToggle(card.card_uuid, v)}
-                        disabled={!selectedCards.includes(card.card_uuid)}
+                        checked={(selectedVersions[card.serial_id] || []).includes(v)}
+                        onChange={() => handleVersionToggle(card.serial_id, v)}
+                        disabled={!selectedCards.includes(card.serial_id)}
                       />
                       {v}
                     </label>
