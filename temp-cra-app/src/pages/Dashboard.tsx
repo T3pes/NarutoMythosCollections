@@ -42,21 +42,19 @@ function Dashboard() {
     loadAll();
   }, [user]);
 
-  // Pre-popola selezioni dai dati salvati
+  // Pre-popola selectedVersions dai dati salvati (ma NON selectedCards: le carte non appaiono pre-selezionate)
   useEffect(() => {
     if (cards.length === 0) return;
     const newVersions: { [groupKey: string]: string[] } = {};
-    const newSelected: string[] = [];
     userCards.forEach(uc => {
       const card = cards.find(c => c.serial_id === uc.card_uuid);
       if (!card) return;
       const groupKey = String(card.id) + '-' + card.name;
       if (!newVersions[groupKey]) newVersions[groupKey] = [];
       if (!newVersions[groupKey].includes(uc.version)) newVersions[groupKey].push(uc.version);
-      if (!newSelected.includes(groupKey)) newSelected.push(groupKey);
     });
     setSelectedVersions(newVersions);
-    setSelectedCards(newSelected);
+    // selectedCards NON viene pre-popolato: l'utente deve selezionare manualmente
   }, [userCards, cards]);
 
   const showVersions = (rarity: string) =>
