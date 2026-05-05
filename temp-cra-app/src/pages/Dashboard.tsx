@@ -58,8 +58,8 @@ function Dashboard() {
   // Salva la selezione: salva tutte le carte selezionate (serial_id/version)
   const handleSaveSelection = async () => {
     if (!user) return;
-    // Trova le carte selezionate
-    const toSave = filteredCards.filter(card => selectedCards.includes(card.serial_id))
+    // Trova le carte selezionate tra TUTTE le carte (non solo quelle filtrate)
+    const toSave = cards.filter(card => selectedCards.includes(card.serial_id))
       .map(card => ({ user_id: user.id, card_uuid: card.serial_id, version: card.version }));
     // Rimuovi tutte le user_cards dell'utente
     await supabase.from('user_cards').delete().eq('user_id', user.id);
