@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import * as XLSX from 'xlsx';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../auth/AuthContext';
 
-type Tab = 'possedute' | 'mancanti';
+type Tab = 'possedute' | 'mancanti' | 'lista';
 
 function CardList() {
   const { user } = useAuth();
@@ -14,6 +15,8 @@ function CardList() {
   const [rarityFilter, setRarityFilter] = useState<string>('');
   const [versionFilter, setVersionFilter] = useState<string>('');
   const [setFilter, setSetFilter] = useState<string>('');
+  const [listRarityFilter, setListRarityFilter] = useState('');
+  const [listVersionFilter, setListVersionFilter] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -84,6 +87,30 @@ function CardList() {
         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 bg-gray-100'
     }`;
 
+  // --- Excel export ---
+  const handleExportExcel = () => {
+    const rows = missingCards.map(c => ({
+      '#': c.id,
+      'Nome': c.name,
+      'Rarità': c.rarity,
+      'Versione': c.version ?? '',
+      'Tipo': c.type,
+      'Set': c.set,
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Carte Mancanti');
+    XLSX.writeFile(wb, 'carte_mancanti.xlsx');
+  };
+
+  // --- Filtri per tabella lista mancanti ---
+  const listRarities = Array.from(new Set(missingCards.map(c => c.rarity).filter(Boolean)));
+  const listVersions = Array.from(new Set(missingCards.map(c => c.version).filter(Boolean)));
+  const filteredMissingList = missingCards.filter(c =>
+    (!listRarityFilter || c.rarity === listRarityFilter) &&
+    (!listVersionFilter || c.version === listVersionFilter)
+  );
+
   return (
     <div className="p-4">
       <h2 className="text-2xl font-bold mb-3">La tua collezione</h2>
@@ -97,6 +124,10 @@ function CardList() {
         <button className={tabClass('mancanti')} onClick={() => { setTab('mancanti'); resetFilters(); }}>
           ❌ Carte mancanti
           {!loading && <span className="ml-1 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">{missingCards.length}</span>}
+        </button>
+        <button className={tabClass('lista')} onClick={() => { setTab('lista'); resetFilters(); }}>
+          📋 Lista acquisti
+          {!loading && <span className="ml-1 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{missingCards.length}</span>}
         </button>
       </div>
 
@@ -112,87 +143,156 @@ function CardList() {
         </div>
       )}
 
-      {/* Filtri */}
-      <div className="flex flex-wrap gap-4 mb-4 items-center">
-        <label className="text-sm">
-          Rarità:
-          <select className="ml-2 border rounded px-2 py-1 text-sm" value={rarityFilter} onChange={e => setRarityFilter(e.target.value)}>
-            <option value="">Tutte</option>
-            {rarities.map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
-        </label>
-        <label className="text-sm">
-          Versione:
-          <select className="ml-2 border rounded px-2 py-1 text-sm" value={versionFilter} onChange={e => setVersionFilter(e.target.value)}>
-            <option value="">Tutte</option>
-            {versions.map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
-        </label>
-        <label className="text-sm">
-          Set:
-          <select className="ml-2 border rounded px-2 py-1 text-sm" value={setFilter} onChange={e => setSetFilter(e.target.value)}>
-            <option value="">Tutti</option>
-            {sets.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
-        </label>
-        <span className="ml-auto text-xs text-gray-500">{filtered.length} {tab === 'possedute' ? 'possedute' : 'mancanti'}</span>
-      </div>
-
       {loading && <div>Caricamento carte...</div>}
-      {error && <div className="text-red-600">{error}</div>}
-      {!loading && !error && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-          {filtered.length === 0 && (
-            <div className="col-span-full text-gray-500">
-              {tab === 'possedute'
-                ? (ownedCards.length === 0 ? 'Nessuna carta posseduta.' : 'Nessuna carta corrisponde ai filtri.')
-                : (missingCards.length === 0 ? '🎉 Collezione completa!' : 'Nessuna carta corrisponde ai filtri.')}
+      {!loading && error && <div className="text-red-600">{error}</div>}
+
+      {/* Tab: Lista acquisti */}
+      {!loading && !error && tab === 'lista' && (
+        <div>
+          {/* Toolbar filtri + export */}
+          <div className="flex flex-wrap gap-3 mb-4 items-center">
+            <label className="text-sm">
+              Rarità:
+              <select className="ml-2 border rounded px-2 py-1 text-sm" value={listRarityFilter} onChange={e => setListRarityFilter(e.target.value)}>
+                <option value="">Tutte</option>
+                {listRarities.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </label>
+            <label className="text-sm">
+              Versione:
+              <select className="ml-2 border rounded px-2 py-1 text-sm" value={listVersionFilter} onChange={e => setListVersionFilter(e.target.value)}>
+                <option value="">Tutte</option>
+                {listVersions.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </label>
+            <span className="text-xs text-gray-500">{filteredMissingList.length} carte</span>
+            <button
+              onClick={handleExportExcel}
+              disabled={missingCards.length === 0}
+              className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm font-semibold rounded hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              ⬇ Scarica Excel
+            </button>
+          </div>
+
+          {/* Tabella */}
+          {filteredMissingList.length === 0 ? (
+            <div className="text-gray-500 py-8 text-center">🎉 Collezione completa!</div>
+          ) : (
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="min-w-full text-sm bg-white">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600 w-12">#</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Nome</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Rarità</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Versione</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Set</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredMissingList.map((card, i) => (
+                    <tr key={card.serial_id} className={`border-b border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-orange-50`}>
+                      <td className="px-3 py-2 text-gray-400 text-xs">{card.id}</td>
+                      <td className="px-3 py-2 font-medium text-gray-800">{card.name}</td>
+                      <td className="px-3 py-2">
+                        <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-700">{card.rarity}</span>
+                      </td>
+                      <td className="px-3 py-2 text-gray-600 text-xs">{card.version ?? '—'}</td>
+                      <td className="px-3 py-2 text-gray-500 text-xs">{card.type}</td>
+                      <td className="px-3 py-2 text-gray-500 text-xs">{card.set}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
-          {filtered.map(card => (
-            <article
-              key={card.serial_id}
-              className={`border-2 rounded-lg p-3 bg-white flex flex-col items-center ${
-                tab === 'possedute' ? 'border-green-500' : 'border-red-300 opacity-80'
-              }`}
-            >
-              <div className="flex items-center w-full mb-1">
-                <span className="text-xs text-gray-500">#{card.id}</span>
-                {card.version && (
-                  <span className="ml-auto text-xs font-medium px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
-                    {card.version}
-                  </span>
-                )}
-                {tab === 'possedute' && (
-                  <button
-                    onClick={() => handleRemove(card.serial_id)}
-                    className="ml-2 text-red-400 hover:text-red-600 text-xs"
-                    title="Rimuovi dalla collezione"
-                  >🗑</button>
-                )}
-              </div>
-              <h3 className="font-semibold text-sm mb-2 text-center">{card.name}</h3>
-              {card.image_url ? (
-                <a href={card.image_url} target="_blank" rel="noopener noreferrer" className="block w-full">
-                  <img
-                    src={card.image_url}
-                    alt={`Carta ${card.id} - ${card.name}`}
-                    className={`w-auto h-64 mx-auto rounded mb-2 bg-gray-100 object-contain ${tab === 'mancanti' ? 'grayscale' : ''}`}
-                    style={{ maxHeight: 260, maxWidth: '100%' }}
-                    loading="lazy"
-                  />
-                </a>
-              ) : (
-                <div className="w-full h-64 rounded mb-2 bg-gray-100 flex items-center justify-center text-xs text-gray-500">
-                  Immagine non disponibile
-                </div>
-              )}
-              <div className="text-xs text-gray-700">Rarità: <strong>{card.rarity}</strong></div>
-              <div className="text-xs text-gray-700">Tipo: <strong>{card.type}</strong></div>
-              <div className="text-xs text-gray-700">Set: <strong>{card.set}</strong></div>
-            </article>
-          ))}
         </div>
+      )}
+
+      {/* Tab: Possedute / Mancanti (griglia card) */}
+      {!loading && !error && tab !== 'lista' && (
+        <>
+          {/* Filtri */}
+          <div className="flex flex-wrap gap-4 mb-4 items-center">
+            <label className="text-sm">
+              Rarità:
+              <select className="ml-2 border rounded px-2 py-1 text-sm" value={rarityFilter} onChange={e => setRarityFilter(e.target.value)}>
+                <option value="">Tutte</option>
+                {rarities.map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </label>
+            <label className="text-sm">
+              Versione:
+              <select className="ml-2 border rounded px-2 py-1 text-sm" value={versionFilter} onChange={e => setVersionFilter(e.target.value)}>
+                <option value="">Tutte</option>
+                {versions.map(v => <option key={v} value={v}>{v}</option>)}
+              </select>
+            </label>
+            <label className="text-sm">
+              Set:
+              <select className="ml-2 border rounded px-2 py-1 text-sm" value={setFilter} onChange={e => setSetFilter(e.target.value)}>
+                <option value="">Tutti</option>
+                {sets.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </label>
+            <span className="ml-auto text-xs text-gray-500">{filtered.length} {tab === 'possedute' ? 'possedute' : 'mancanti'}</span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {filtered.length === 0 && (
+              <div className="col-span-full text-gray-500">
+                {tab === 'possedute'
+                  ? (ownedCards.length === 0 ? 'Nessuna carta posseduta.' : 'Nessuna carta corrisponde ai filtri.')
+                  : (missingCards.length === 0 ? '🎉 Collezione completa!' : 'Nessuna carta corrisponde ai filtri.')}
+              </div>
+            )}
+            {filtered.map(card => (
+              <article
+                key={card.serial_id}
+                className={`border-2 rounded-lg p-3 bg-white flex flex-col items-center ${
+                  tab === 'possedute' ? 'border-green-500' : 'border-red-300 opacity-80'
+                }`}
+              >
+                <div className="flex items-center w-full mb-1">
+                  <span className="text-xs text-gray-500">#{card.id}</span>
+                  {card.version && (
+                    <span className="ml-auto text-xs font-medium px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
+                      {card.version}
+                    </span>
+                  )}
+                  {tab === 'possedute' && (
+                    <button
+                      onClick={() => handleRemove(card.serial_id)}
+                      className="ml-2 text-red-400 hover:text-red-600 text-xs"
+                      title="Rimuovi dalla collezione"
+                    >🗑</button>
+                  )}
+                </div>
+                <h3 className="font-semibold text-sm mb-2 text-center">{card.name}</h3>
+                {card.image_url ? (
+                  <a href={card.image_url} target="_blank" rel="noopener noreferrer" className="block w-full">
+                    <img
+                      src={card.image_url}
+                      alt={`Carta ${card.id} - ${card.name}`}
+                      className={`w-auto h-64 mx-auto rounded mb-2 bg-gray-100 object-contain ${tab === 'mancanti' ? 'grayscale' : ''}`}
+                      style={{ maxHeight: 260, maxWidth: '100%' }}
+                      loading="lazy"
+                    />
+                  </a>
+                ) : (
+                  <div className="w-full h-64 rounded mb-2 bg-gray-100 flex items-center justify-center text-xs text-gray-500">
+                    Immagine non disponibile
+                  </div>
+                )}
+                <div className="text-xs text-gray-700">Rarità: <strong>{card.rarity}</strong></div>
+                <div className="text-xs text-gray-700">Tipo: <strong>{card.type}</strong></div>
+                <div className="text-xs text-gray-700">Set: <strong>{card.set}</strong></div>
+              </article>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
