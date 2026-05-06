@@ -111,6 +111,7 @@ function CardList() {
     (!listVersionFilter || c.version === listVersionFilter)
   );
 
+
   return (
     <div className="p-4">
       <h2 className="text-2xl font-bold mb-3">La tua collezione</h2>
