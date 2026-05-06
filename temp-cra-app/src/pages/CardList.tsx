@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import * as XLSX from 'xlsx';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../auth/AuthContext';
 
@@ -87,20 +86,25 @@ function CardList() {
         : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 bg-gray-100'
     }`;
 
-  // --- Excel export ---
+  // --- Export CSV (aperto da Excel) ---
   const handleExportExcel = () => {
-    const rows = missingCards.map(c => ({
-      '#': c.id,
-      'Nome': c.name,
-      'Rarità': c.rarity,
-      'Versione': c.version ?? '',
-      'Tipo': c.type,
-      'Set': c.set,
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Carte Mancanti');
-    XLSX.writeFile(wb, 'carte_mancanti.xlsx');
+    const headers = ['#', 'Nome', 'Rarita', 'Versione', 'Tipo', 'Set'];
+    const rows = missingCards.map(c => [
+      c.id,
+      `"${(c.name ?? '').replace(/"/g, '""')}"`,
+      c.rarity ?? '',
+      c.version ?? '',
+      c.type ?? '',
+      `"${(c.set ?? '').replace(/"/g, '""')}"`,
+    ]);
+    const csv = [headers.join(';'), ...rows.map(r => r.join(';'))].join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'carte_mancanti.csv';
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   // --- Filtri per tabella lista mancanti ---
@@ -172,7 +176,7 @@ function CardList() {
               disabled={missingCards.length === 0}
               className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm font-semibold rounded hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              ⬇ Scarica Excel
+              ⬇ Scarica CSV (Excel)
             </button>
           </div>
 
