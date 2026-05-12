@@ -16,6 +16,8 @@ function CardList() {
   const [setFilter, setSetFilter] = useState<string>('');
   const [listRarityFilter, setListRarityFilter] = useState('');
   const [listVersionFilter, setListVersionFilter] = useState('');
+  const [selectedUuids, setSelectedUuids] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -56,6 +58,51 @@ function CardList() {
       });
     } else {
       console.error('Errore rimozione:', err);
+    }
+  };
+
+  const handleAdd = async (card: any) => {
+    if (!user) return;
+    const { error: err } = await supabase
+      .from('user_cards')
+      .insert({ user_id: user.id, card_uuid: card.serial_id, version: card.version ?? 'normale' });
+    if (!err) {
+      setOwnedUuids(prev => new Set(Array.from(prev).concat(card.serial_id)));
+    } else {
+      console.error('Errore aggiunta:', err);
+    }
+  };
+
+  const handleAddSelected = async () => {
+    if (!user || selectedUuids.size === 0) return;
+    setSaving(true);
+    const toInsert = allCards
+      .filter(c => selectedUuids.has(c.serial_id))
+      .map(c => ({ user_id: user.id, card_uuid: c.serial_id, version: c.version ?? 'normale' }));
+    const { error: err } = await supabase.from('user_cards').insert(toInsert);
+    if (!err) {
+      setOwnedUuids(prev => new Set([...Array.from(prev), ...Array.from(selectedUuids)]));
+      setSelectedUuids(new Set());
+    } else {
+      console.error('Errore aggiunta multipla:', err);
+    }
+    setSaving(false);
+  };
+
+  const toggleSelect = (uuid: string) => {
+    setSelectedUuids(prev => {
+      const next = new Set(Array.from(prev));
+      next.has(uuid) ? next.delete(uuid) : next.add(uuid);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = (cards: any[]) => {
+    const allSelected = cards.every(c => selectedUuids.has(c.serial_id));
+    if (allSelected) {
+      setSelectedUuids(new Set());
+    } else {
+      setSelectedUuids(new Set(cards.map(c => c.serial_id)));
     }
   };
 
@@ -171,10 +218,19 @@ function CardList() {
               </select>
             </label>
             <span className="text-xs text-gray-500">{filteredMissingList.length} carte</span>
+            {selectedUuids.size > 0 && (
+              <button
+                onClick={handleAddSelected}
+                disabled={saving}
+                className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm font-semibold rounded hover:bg-green-700 disabled:opacity-40"
+              >
+                {saving ? '...' : `✅ Aggiungi selezionate (${selectedUuids.size})`}
+              </button>
+            )}
             <button
               onClick={handleExportExcel}
               disabled={missingCards.length === 0}
-              className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm font-semibold rounded hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm font-semibold rounded hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               ⬇ Scarica CSV (Excel)
             </button>
@@ -188,17 +244,36 @@ function CardList() {
               <table className="min-w-full text-sm bg-white">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="px-3 py-2 w-8">
+                      <input
+                        type="checkbox"
+                        checked={filteredMissingList.length > 0 && filteredMissingList.every(c => selectedUuids.has(c.serial_id))}
+                        onChange={() => toggleSelectAll(filteredMissingList)}
+                        title="Seleziona tutti"
+                      />
+                    </th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600 w-12">#</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Nome</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Rarità</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Versione</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Set</th>
+                    <th className="px-3 py-2 w-10"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredMissingList.map((card, i) => (
-                    <tr key={card.serial_id} className={`border-b border-gray-100 ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-orange-50`}>
+                    <tr
+                      key={card.serial_id}
+                      className={`border-b border-gray-100 ${selectedUuids.has(card.serial_id) ? 'bg-green-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-orange-50`}
+                    >
+                      <td className="px-3 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedUuids.has(card.serial_id)}
+                          onChange={() => toggleSelect(card.serial_id)}
+                        />
+                      </td>
                       <td className="px-3 py-2 text-gray-400 text-xs">{card.id}</td>
                       <td className="px-3 py-2 font-medium text-gray-800">{card.name}</td>
                       <td className="px-3 py-2">
@@ -207,6 +282,13 @@ function CardList() {
                       <td className="px-3 py-2 text-gray-600 text-xs">{card.version ?? '—'}</td>
                       <td className="px-3 py-2 text-gray-500 text-xs">{card.type}</td>
                       <td className="px-3 py-2 text-gray-500 text-xs">{card.set}</td>
+                      <td className="px-3 py-2 text-center">
+                        <button
+                          onClick={() => handleAdd(card)}
+                          className="text-green-500 hover:text-green-700 text-lg font-bold leading-none"
+                          title="Aggiungi alla collezione"
+                        >＋</button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -273,6 +355,13 @@ function CardList() {
                       className="ml-2 text-red-400 hover:text-red-600 text-xs"
                       title="Rimuovi dalla collezione"
                     >🗑</button>
+                  )}
+                  {tab === 'mancanti' && (
+                    <button
+                      onClick={() => handleAdd(card)}
+                      className="ml-2 text-green-500 hover:text-green-700 font-bold text-base leading-none"
+                      title="Aggiungi alla collezione"
+                    >＋</button>
                   )}
                 </div>
                 <h3 className="font-semibold text-sm mb-2 text-center">{card.name}</h3>
