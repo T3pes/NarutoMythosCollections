@@ -297,6 +297,8 @@ function CardList() {
     (!pendingRarityFilter || c.rarity === pendingRarityFilter) &&
     (!pendingVersionFilter || c.version === pendingVersionFilter)
   );
+  const allFilteredPendingSelected =
+    filteredPendingList.length > 0 && filteredPendingList.every(c => selectedPendingUuids.has(c.serial_id));
 
   const openTab = (nextTab: Tab) => {
     setTab(nextTab);
@@ -491,6 +493,13 @@ function CardList() {
                   </select>
                 </label>
                 <span className="text-xs text-gray-500">{filteredPendingList.length} carte</span>
+                <button
+                  onClick={() => togglePendingSelectAll(filteredPendingList)}
+                  disabled={filteredPendingList.length === 0}
+                  className="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm font-semibold rounded hover:bg-gray-200 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {allFilteredPendingSelected ? 'Deseleziona tutti' : 'Seleziona tutti'}
+                </button>
               </div>
 
               <div className="overflow-x-auto rounded-lg border border-gray-200">
@@ -500,7 +509,7 @@ function CardList() {
                       <th className="px-3 py-2 w-8">
                         <input
                           type="checkbox"
-                          checked={filteredPendingList.length > 0 && filteredPendingList.every(c => selectedPendingUuids.has(c.serial_id))}
+                          checked={allFilteredPendingSelected}
                           onChange={() => togglePendingSelectAll(filteredPendingList)}
                           title="Seleziona tutti"
                         />
