@@ -22,6 +22,7 @@ function CardList() {
   const [pendingRarityFilter, setPendingRarityFilter] = useState('');
   const [pendingVersionFilter, setPendingVersionFilter] = useState('');
   const [useSupabasePending, setUseSupabasePending] = useState(true);
+  const [pendingSyncWarning, setPendingSyncWarning] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -52,6 +53,7 @@ function CardList() {
       if (err3) {
         // Fallback locale finché la tabella pending_cards non viene creata su Supabase.
         setUseSupabasePending(false);
+        setPendingSyncWarning('Lista in attesa salvata solo su questo dispositivo. Per sincronizzare tra PC e smartphone esegui lo script SQL di setup pending_cards su Supabase.');
         const savedPending = localStorage.getItem(`pending_cards_${user.id}`);
         if (savedPending) {
           try {
@@ -65,7 +67,39 @@ function CardList() {
         }
       } else {
         setUseSupabasePending(true);
-        setPendingUuids(new Set((pc ?? []).map((r: any) => r.card_uuid)));
+        setPendingSyncWarning(null);
+        const remotePending = new Set((pc ?? []).map((r: any) => r.card_uuid));
+
+        // Migra eventuali carte in attesa locali nel cloud quando disponibile.
+        const savedPending = localStorage.getItem(`pending_cards_${user.id}`);
+        if (savedPending) {
+          try {
+            const parsed = JSON.parse(savedPending);
+            const localPending = Array.isArray(parsed) ? parsed : [];
+            const mergedPending = Array.from(new Set([...Array.from(remotePending), ...localPending]));
+
+            if (mergedPending.length > 0) {
+              const rows = mergedPending.map(cardUuid => ({ user_id: user.id, card_uuid: cardUuid }));
+              const { error: migrateErr } = await supabase
+                .from('pending_cards')
+                .upsert(rows, { onConflict: 'user_id,card_uuid' });
+
+              if (!migrateErr) {
+                setPendingUuids(new Set(mergedPending));
+                localStorage.removeItem(`pending_cards_${user.id}`);
+              } else {
+                setPendingUuids(remotePending);
+                console.error('Errore migrazione pending locale -> cloud:', migrateErr);
+              }
+            } else {
+              setPendingUuids(remotePending);
+            }
+          } catch {
+            setPendingUuids(remotePending);
+          }
+        } else {
+          setPendingUuids(remotePending);
+        }
       }
 
       setLoading(false);
@@ -350,6 +384,11 @@ function CardList() {
 
       {loading && <div>Caricamento carte...</div>}
       {!loading && error && <div className="text-red-600">{error}</div>}
+      {!loading && !error && pendingSyncWarning && (
+        <div className="mb-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {pendingSyncWarning}
+        </div>
+      )}
 
       {/* Tab: Lista acquisti */}
       {!loading && !error && tab === 'lista' && (
