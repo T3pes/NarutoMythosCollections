@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../auth/AuthContext';
 
-type Tab = 'possedute' | 'mancanti' | 'lista';
+type Tab = 'possedute' | 'mancanti' | 'lista' | 'in_arrivo';
 
 function CardList() {
   const { user } = useAuth();
@@ -17,6 +17,11 @@ function CardList() {
   const [listRarityFilter, setListRarityFilter] = useState('');
   const [listVersionFilter, setListVersionFilter] = useState('');
   const [selectedUuids, setSelectedUuids] = useState<Set<string>>(new Set());
+  const [pendingUuids, setPendingUuids] = useState<Set<string>>(new Set());
+  const [selectedPendingUuids, setSelectedPendingUuids] = useState<Set<string>>(new Set());
+  const [pendingRarityFilter, setPendingRarityFilter] = useState('');
+  const [pendingVersionFilter, setPendingVersionFilter] = useState('');
+  const [useSupabasePending, setUseSupabasePending] = useState(true);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -39,10 +44,43 @@ function CardList() {
         .eq('user_id', user.id);
       if (err2) { setError('Errore caricamento collezione'); setLoading(false); return; }
       setOwnedUuids(new Set((uc ?? []).map((r: any) => r.card_uuid)));
+
+      const { data: pc, error: err3 } = await supabase
+        .from('pending_cards')
+        .select('card_uuid')
+        .eq('user_id', user.id);
+      if (err3) {
+        // Fallback locale finché la tabella pending_cards non viene creata su Supabase.
+        setUseSupabasePending(false);
+        const savedPending = localStorage.getItem(`pending_cards_${user.id}`);
+        if (savedPending) {
+          try {
+            const parsed = JSON.parse(savedPending);
+            setPendingUuids(new Set(Array.isArray(parsed) ? parsed : []));
+          } catch {
+            setPendingUuids(new Set());
+          }
+        } else {
+          setPendingUuids(new Set());
+        }
+      } else {
+        setUseSupabasePending(true);
+        setPendingUuids(new Set((pc ?? []).map((r: any) => r.card_uuid)));
+      }
+
       setLoading(false);
     }
     load();
   }, [user]);
+
+  useEffect(() => {
+    if (!user || useSupabasePending) return;
+    localStorage.setItem(`pending_cards_${user.id}`, JSON.stringify(Array.from(pendingUuids)));
+  }, [pendingUuids, user, useSupabasePending]);
+
+  useEffect(() => {
+    setPendingUuids(prev => new Set(Array.from(prev).filter(uuid => !ownedUuids.has(uuid))));
+  }, [ownedUuids]);
 
   const handleRemove = async (cardUuid: string) => {
     if (!user) return;
@@ -73,23 +111,95 @@ function CardList() {
     }
   };
 
-  const handleAddSelected = async () => {
-    if (!user || selectedUuids.size === 0) return;
+  const handleMoveSelectedToPending = async () => {
+    if (selectedUuids.size === 0) return;
+    const toMove = Array.from(selectedUuids);
+    if (user && useSupabasePending) {
+      setSaving(true);
+      const rows = toMove.map(cardUuid => ({ user_id: user.id, card_uuid: cardUuid }));
+      const { error: err } = await supabase
+        .from('pending_cards')
+        .upsert(rows, { onConflict: 'user_id,card_uuid' });
+      if (err) {
+        console.error('Errore inserimento in attesa:', err);
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+    }
+    setPendingUuids(prev => new Set([...Array.from(prev), ...toMove]));
+    setSelectedUuids(new Set());
+    setTab('in_arrivo');
+  };
+
+  const handleMoveSingleToPending = async (cardUuid: string) => {
+    if (pendingUuids.has(cardUuid)) return;
+    if (user && useSupabasePending) {
+      setSaving(true);
+      const { error: err } = await supabase
+        .from('pending_cards')
+        .upsert([{ user_id: user.id, card_uuid: cardUuid }], { onConflict: 'user_id,card_uuid' });
+      if (err) {
+        console.error('Errore inserimento singolo in attesa:', err);
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+    }
+    setPendingUuids(prev => new Set(Array.from(prev).concat(cardUuid)));
+  };
+
+  const handleImportPendingToOwned = async () => {
+    if (!user || selectedPendingUuids.size === 0) return;
     setSaving(true);
+    const selectedPending = Array.from(selectedPendingUuids);
     const toInsert = allCards
-      .filter(c => selectedUuids.has(c.serial_id))
+      .filter(c => selectedPendingUuids.has(c.serial_id))
       .map(c => ({ user_id: user.id, card_uuid: c.serial_id, version: c.version ?? 'normale' }));
     const { error: err } = await supabase.from('user_cards').insert(toInsert);
     if (!err) {
-      setOwnedUuids(prev => new Set([...Array.from(prev), ...Array.from(selectedUuids)]));
-      setSelectedUuids(new Set());
+      if (useSupabasePending) {
+        const { error: pendingDeleteErr } = await supabase
+          .from('pending_cards')
+          .delete()
+          .eq('user_id', user.id)
+          .in('card_uuid', selectedPending);
+        if (pendingDeleteErr) {
+          console.error('Errore pulizia carte in attesa:', pendingDeleteErr);
+        }
+      }
+      setOwnedUuids(prev => new Set([...Array.from(prev), ...selectedPending]));
+      setPendingUuids(prev => new Set(Array.from(prev).filter(uuid => !selectedPending.includes(uuid))));
+      setSelectedPendingUuids(new Set());
     } else {
-      console.error('Errore aggiunta multipla:', err);
+      console.error('Errore importazione in possedute:', err);
     }
     setSaving(false);
   };
 
+  const handleRemoveSelectedFromPending = async () => {
+    if (selectedPendingUuids.size === 0) return;
+    const selectedPending = Array.from(selectedPendingUuids);
+    if (user && useSupabasePending) {
+      setSaving(true);
+      const { error: err } = await supabase
+        .from('pending_cards')
+        .delete()
+        .eq('user_id', user.id)
+        .in('card_uuid', selectedPending);
+      if (err) {
+        console.error('Errore rimozione dalla lista in attesa:', err);
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+    }
+    setPendingUuids(prev => new Set(Array.from(prev).filter(uuid => !selectedPending.includes(uuid))));
+    setSelectedPendingUuids(new Set());
+  };
+
   const toggleSelect = (uuid: string) => {
+    if (pendingUuids.has(uuid)) return;
     setSelectedUuids(prev => {
       const next = new Set(Array.from(prev));
       next.has(uuid) ? next.delete(uuid) : next.add(uuid);
@@ -98,16 +208,35 @@ function CardList() {
   };
 
   const toggleSelectAll = (cards: any[]) => {
-    const allSelected = cards.every(c => selectedUuids.has(c.serial_id));
+    const selectableCards = cards.filter(c => !pendingUuids.has(c.serial_id));
+    const allSelected = selectableCards.length > 0 && selectableCards.every(c => selectedUuids.has(c.serial_id));
     if (allSelected) {
       setSelectedUuids(new Set());
     } else {
-      setSelectedUuids(new Set(cards.map(c => c.serial_id)));
+      setSelectedUuids(new Set(selectableCards.map(c => c.serial_id)));
+    }
+  };
+
+  const togglePendingSelect = (uuid: string) => {
+    setSelectedPendingUuids(prev => {
+      const next = new Set(Array.from(prev));
+      next.has(uuid) ? next.delete(uuid) : next.add(uuid);
+      return next;
+    });
+  };
+
+  const togglePendingSelectAll = (cards: any[]) => {
+    const allSelected = cards.every(c => selectedPendingUuids.has(c.serial_id));
+    if (allSelected) {
+      setSelectedPendingUuids(new Set());
+    } else {
+      setSelectedPendingUuids(new Set(cards.map(c => c.serial_id)));
     }
   };
 
   const ownedCards = allCards.filter(c => ownedUuids.has(c.serial_id));
   const missingCards = allCards.filter(c => !ownedUuids.has(c.serial_id));
+  const pendingCards = allCards.filter(c => pendingUuids.has(c.serial_id) && !ownedUuids.has(c.serial_id));
   const displayCards = tab === 'possedute' ? ownedCards : missingCards;
 
   const rarities = Array.from(new Set(displayCards.map(c => c.rarity).filter(Boolean)));
@@ -162,24 +291,46 @@ function CardList() {
     (!listVersionFilter || c.version === listVersionFilter)
   );
 
+  const pendingRarities = Array.from(new Set(pendingCards.map(c => c.rarity).filter(Boolean)));
+  const pendingVersions = Array.from(new Set(pendingCards.map(c => c.version).filter(Boolean)));
+  const filteredPendingList = pendingCards.filter(c =>
+    (!pendingRarityFilter || c.rarity === pendingRarityFilter) &&
+    (!pendingVersionFilter || c.version === pendingVersionFilter)
+  );
+
+  const openTab = (nextTab: Tab) => {
+    setTab(nextTab);
+    resetFilters();
+    setListRarityFilter('');
+    setListVersionFilter('');
+    setPendingRarityFilter('');
+    setPendingVersionFilter('');
+    setSelectedUuids(new Set());
+    setSelectedPendingUuids(new Set());
+  };
+
 
   return (
     <div className="p-4">
       <h2 className="text-2xl font-bold mb-3">La tua collezione</h2>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-gray-200 mb-4">
-        <button className={tabClass('possedute')} onClick={() => { setTab('possedute'); resetFilters(); }}>
+      <div className="flex flex-wrap gap-1 border-b border-gray-200 mb-4">
+        <button className={tabClass('possedute')} onClick={() => openTab('possedute')}>
           ✅ Carte possedute
           {!loading && <span className="ml-1 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">{ownedCards.length}</span>}
         </button>
-        <button className={tabClass('mancanti')} onClick={() => { setTab('mancanti'); resetFilters(); }}>
+        <button className={tabClass('mancanti')} onClick={() => openTab('mancanti')}>
           ❌ Carte mancanti
           {!loading && <span className="ml-1 text-xs bg-red-100 text-red-700 px-1.5 py-0.5 rounded-full">{missingCards.length}</span>}
         </button>
-        <button className={tabClass('lista')} onClick={() => { setTab('lista'); resetFilters(); }}>
+        <button className={tabClass('lista')} onClick={() => openTab('lista')}>
           📋 Lista acquisti
           {!loading && <span className="ml-1 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{missingCards.length}</span>}
+        </button>
+        <button className={tabClass('in_arrivo')} onClick={() => openTab('in_arrivo')}>
+          📦 In attesa di arrivo
+          {!loading && <span className="ml-1 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded-full">{pendingCards.length}</span>}
         </button>
       </div>
 
@@ -220,11 +371,11 @@ function CardList() {
             <span className="text-xs text-gray-500">{filteredMissingList.length} carte</span>
             {selectedUuids.size > 0 && (
               <button
-                onClick={handleAddSelected}
+                onClick={handleMoveSelectedToPending}
                 disabled={saving}
-                className="flex items-center gap-2 px-3 py-1.5 bg-green-600 text-white text-sm font-semibold rounded hover:bg-green-700 disabled:opacity-40"
+                className="flex items-center gap-2 px-3 py-1.5 bg-amber-600 text-white text-sm font-semibold rounded hover:bg-amber-700 disabled:opacity-40"
               >
-                {saving ? '...' : `✅ Aggiungi selezionate (${selectedUuids.size})`}
+                {saving ? 'Spostamento...' : `📦 Metti in attesa (${selectedUuids.size})`}
               </button>
             )}
             <button
@@ -258,19 +409,24 @@ function CardList() {
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Versione</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Set</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Stato</th>
                     <th className="px-3 py-2 w-10"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredMissingList.map((card, i) => (
+                    (() => {
+                      const isPending = pendingUuids.has(card.serial_id);
+                      return (
                     <tr
                       key={card.serial_id}
-                      className={`border-b border-gray-100 ${selectedUuids.has(card.serial_id) ? 'bg-green-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-orange-50`}
+                      className={`border-b border-gray-100 ${isPending ? 'bg-yellow-50' : selectedUuids.has(card.serial_id) ? 'bg-green-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-orange-50`}
                     >
                       <td className="px-3 py-2 text-center">
                         <input
                           type="checkbox"
                           checked={selectedUuids.has(card.serial_id)}
+                          disabled={isPending}
                           onChange={() => toggleSelect(card.serial_id)}
                         />
                       </td>
@@ -282,14 +438,28 @@ function CardList() {
                       <td className="px-3 py-2 text-gray-600 text-xs">{card.version ?? '—'}</td>
                       <td className="px-3 py-2 text-gray-500 text-xs">{card.type}</td>
                       <td className="px-3 py-2 text-gray-500 text-xs">{card.set}</td>
+                      <td className="px-3 py-2 text-xs">
+                        {isPending ? (
+                          <span className="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 font-semibold">acquistata in attesa</span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 text-center">
-                        <button
-                          onClick={() => handleAdd(card)}
-                          className="text-green-500 hover:text-green-700 text-lg font-bold leading-none"
-                          title="Aggiungi alla collezione"
-                        >＋</button>
+                        {isPending ? (
+                          <span className="text-yellow-700 text-xs font-semibold">in attesa</span>
+                        ) : (
+                          <button
+                            onClick={() => handleMoveSingleToPending(card.serial_id)}
+                            disabled={saving}
+                            className="text-amber-600 hover:text-amber-800 text-lg font-bold leading-none disabled:opacity-40"
+                            title="Metti in attesa di arrivo"
+                          >📦</button>
+                        )}
                       </td>
                     </tr>
+                      );
+                    })()
                   ))}
                 </tbody>
               </table>
@@ -298,8 +468,101 @@ function CardList() {
         </div>
       )}
 
+      {/* Tab: In attesa di arrivo */}
+      {!loading && !error && tab === 'in_arrivo' && (
+        <div>
+          {pendingCards.length === 0 ? (
+            <div className="text-gray-500 py-8 text-center">Nessuna carta in attesa di arrivo.</div>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-3 mb-4 items-center">
+                <label className="text-sm">
+                  Rarità:
+                  <select className="ml-2 border rounded px-2 py-1 text-sm" value={pendingRarityFilter} onChange={e => setPendingRarityFilter(e.target.value)}>
+                    <option value="">Tutte</option>
+                    {pendingRarities.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </label>
+                <label className="text-sm">
+                  Versione:
+                  <select className="ml-2 border rounded px-2 py-1 text-sm" value={pendingVersionFilter} onChange={e => setPendingVersionFilter(e.target.value)}>
+                    <option value="">Tutte</option>
+                    {pendingVersions.map(v => <option key={v} value={v}>{v}</option>)}
+                  </select>
+                </label>
+                <span className="text-xs text-gray-500">{filteredPendingList.length} carte</span>
+              </div>
+
+              <div className="overflow-x-auto rounded-lg border border-gray-200">
+                <table className="min-w-full text-sm bg-white">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="px-3 py-2 w-8">
+                        <input
+                          type="checkbox"
+                          checked={filteredPendingList.length > 0 && filteredPendingList.every(c => selectedPendingUuids.has(c.serial_id))}
+                          onChange={() => togglePendingSelectAll(filteredPendingList)}
+                          title="Seleziona tutti"
+                        />
+                      </th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-600 w-12">#</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-600">Nome</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-600">Rarità</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-600">Versione</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-600">Set</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPendingList.map((card, i) => (
+                      <tr
+                        key={card.serial_id}
+                        className={`border-b border-gray-100 ${selectedPendingUuids.has(card.serial_id) ? 'bg-yellow-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-orange-50`}
+                      >
+                        <td className="px-3 py-2 text-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedPendingUuids.has(card.serial_id)}
+                            onChange={() => togglePendingSelect(card.serial_id)}
+                          />
+                        </td>
+                        <td className="px-3 py-2 text-gray-400 text-xs">{card.id}</td>
+                        <td className="px-3 py-2 font-medium text-gray-800">{card.name}</td>
+                        <td className="px-3 py-2">
+                          <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-700">{card.rarity}</span>
+                        </td>
+                        <td className="px-3 py-2 text-gray-600 text-xs">{card.version ?? '—'}</td>
+                        <td className="px-3 py-2 text-gray-500 text-xs">{card.type}</td>
+                        <td className="px-3 py-2 text-gray-500 text-xs">{card.set}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={handleRemoveSelectedFromPending}
+                  disabled={saving || selectedPendingUuids.size === 0}
+                  className="mr-2 flex items-center gap-2 px-4 py-2 bg-gray-600 text-white text-sm font-semibold rounded hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {saving ? 'Attendi...' : `🗑 Rimuovi selezionate (${selectedPendingUuids.size})`}
+                </button>
+                <button
+                  onClick={handleImportPendingToOwned}
+                  disabled={saving || selectedPendingUuids.size === 0}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded hover:bg-green-700 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {saving ? 'Importazione...' : `✅ Importa nelle carte possedute (${selectedPendingUuids.size})`}
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Tab: Possedute / Mancanti (griglia card) */}
-      {!loading && !error && tab !== 'lista' && (
+      {!loading && !error && (tab === 'possedute' || tab === 'mancanti') && (
         <>
           {/* Filtri */}
           <div className="flex flex-wrap gap-4 mb-4 items-center">
