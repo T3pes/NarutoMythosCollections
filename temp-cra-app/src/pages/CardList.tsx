@@ -445,12 +445,12 @@ function CardList() {
                       />
                     </th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600 w-12">#</th>
+                    <th className="px-3 py-2 text-left font-semibold text-gray-600 w-16">Carta</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Nome</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Rarità</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Versione</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Tipo</th>
                     <th className="px-3 py-2 text-left font-semibold text-gray-600">Set</th>
-                    <th className="px-3 py-2 text-left font-semibold text-gray-600">Stato</th>
                     <th className="px-3 py-2 w-10"></th>
                   </tr>
                 </thead>
@@ -472,6 +472,20 @@ function CardList() {
                         />
                       </td>
                       <td className="px-3 py-2 text-gray-400 text-xs">{card.id}</td>
+                      <td className="px-3 py-2">
+                        {card.image_url ? (
+                          <img
+                            src={card.image_url}
+                            alt={`Miniatura ${card.id} - ${card.name}`}
+                            className="h-10 w-7 rounded object-cover bg-gray-100"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="h-10 w-7 rounded bg-gray-100 text-[10px] text-gray-400 flex items-center justify-center">
+                            —
+                          </div>
+                        )}
+                      </td>
                       <td className="px-3 py-2 font-medium text-gray-800">{card.name}</td>
                       <td className="px-3 py-2">
                         <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-700">{card.rarity}</span>
@@ -479,13 +493,6 @@ function CardList() {
                       <td className="px-3 py-2 text-gray-600 text-xs">{card.version ?? '—'}</td>
                       <td className="px-3 py-2 text-gray-500 text-xs">{card.type}</td>
                       <td className="px-3 py-2 text-gray-500 text-xs">{card.set}</td>
-                      <td className="px-3 py-2 text-xs">
-                        {isPending ? (
-                          <span className="px-2 py-1 rounded-full bg-yellow-100 text-yellow-800 font-semibold">acquistata in attesa</span>
-                        ) : (
-                          <span className="text-gray-400">—</span>
-                        )}
-                      </td>
                       <td className="px-3 py-2 text-center">
                         {isPending ? (
                           <span className="text-yellow-700 text-xs font-semibold">in attesa</span>
