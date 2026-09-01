@@ -477,11 +477,11 @@ function CardList() {
                           <img
                             src={card.image_url}
                             alt={`Miniatura ${card.id} - ${card.name}`}
-                            className="h-10 w-7 rounded object-cover bg-gray-100"
+                            className="h-12 w-8 rounded object-cover bg-gray-100"
                             loading="lazy"
                           />
                         ) : (
-                          <div className="h-10 w-7 rounded bg-gray-100 text-[10px] text-gray-400 flex items-center justify-center">
+                          <div className="h-12 w-8 rounded bg-gray-100 text-[10px] text-gray-400 flex items-center justify-center">
                             —
                           </div>
                         )}
@@ -561,6 +561,7 @@ function CardList() {
                         />
                       </th>
                       <th className="px-3 py-2 text-left font-semibold text-gray-600 w-12">#</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-600 w-16">Carta</th>
                       <th className="px-3 py-2 text-left font-semibold text-gray-600">Nome</th>
                       <th className="px-3 py-2 text-left font-semibold text-gray-600">Rarità</th>
                       <th className="px-3 py-2 text-left font-semibold text-gray-600">Versione</th>
@@ -582,6 +583,20 @@ function CardList() {
                           />
                         </td>
                         <td className="px-3 py-2 text-gray-400 text-xs">{card.id}</td>
+                        <td className="px-3 py-2">
+                          {card.image_url ? (
+                            <img
+                              src={card.image_url}
+                              alt={`Miniatura ${card.id} - ${card.name}`}
+                              className="h-12 w-8 rounded object-cover bg-gray-100"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="h-12 w-8 rounded bg-gray-100 text-[10px] text-gray-400 flex items-center justify-center">
+                              —
+                            </div>
+                          )}
+                        </td>
                         <td className="px-3 py-2 font-medium text-gray-800">{card.name}</td>
                         <td className="px-3 py-2">
                           <span className="px-1.5 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-700">{card.rarity}</span>
