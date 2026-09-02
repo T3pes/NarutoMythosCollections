@@ -31,7 +31,8 @@ function matchesEditionPreset(card: any, preset: EditionPreset): boolean {
 
   if (preset === 'set1_ed1') return inSet1 && isFirstEdition(setText);
   if (preset === 'set1_ed2') return inSet1 && isSecondEdition(setText);
-  if (preset === 'set2_ed1') return inSet2 && isFirstEdition(setText);
+  // Set 2 nel dataset spesso non espone esplicitamente il marker edizione.
+  if (preset === 'set2_ed1') return inSet2 && !isSecondEdition(setText);
   return true;
 }
 
