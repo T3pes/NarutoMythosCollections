@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../auth/AuthContext';
 
 type Tab = 'possedute' | 'mancanti' | 'lista' | 'in_arrivo';
 type EditionPreset = '' | 'set1_ed1' | 'set1_ed2' | 'set2_ed1';
+
+function parseEditionPreset(value: string | null): EditionPreset {
+  return value === 'set1_ed1' || value === 'set1_ed2' || value === 'set2_ed1' ? value : '';
+}
 
 function normalizeText(value: unknown): string {
   return String(value ?? '')
@@ -61,6 +66,8 @@ function editionPresetLabel(preset: EditionPreset): string {
 
 function CardList() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const presetFromUrl = parseEditionPreset(searchParams.get('preset'));
   const [allCards, setAllCards] = useState<any[]>([]);
   const [ownedUuids, setOwnedUuids] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -69,7 +76,7 @@ function CardList() {
   const [rarityFilter, setRarityFilter] = useState<string>('');
   const [versionFilter, setVersionFilter] = useState<string>('');
   const [setFilter, setSetFilter] = useState<string>('');
-  const [editionPreset, setEditionPreset] = useState<EditionPreset>('');
+  const [editionPreset, setEditionPreset] = useState<EditionPreset>(presetFromUrl);
   const [listRarityFilter, setListRarityFilter] = useState('');
   const [listVersionFilter, setListVersionFilter] = useState('');
   const [selectedUuids, setSelectedUuids] = useState<Set<string>>(new Set());
@@ -80,6 +87,19 @@ function CardList() {
   const [useSupabasePending, setUseSupabasePending] = useState(true);
   const [pendingSyncWarning, setPendingSyncWarning] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setEditionPreset(presetFromUrl);
+  }, [presetFromUrl]);
+
+  const applyEditionPreset = (preset: EditionPreset) => {
+    setEditionPreset(preset);
+    if (preset) {
+      setSearchParams({ preset });
+    } else {
+      setSearchParams({});
+    }
+  };
 
   useEffect(() => {
     async function load() {
@@ -422,7 +442,7 @@ function CardList() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
         <button
           type="button"
-          onClick={() => setEditionPreset('set1_ed1')}
+          onClick={() => applyEditionPreset('set1_ed1')}
           className={`rounded-lg border px-3 py-2 text-sm font-semibold text-left transition-colors ${
             editionPreset === 'set1_ed1'
               ? 'bg-orange-600 text-white border-orange-700'
@@ -433,7 +453,7 @@ function CardList() {
         </button>
         <button
           type="button"
-          onClick={() => setEditionPreset('set1_ed2')}
+          onClick={() => applyEditionPreset('set1_ed2')}
           className={`rounded-lg border px-3 py-2 text-sm font-semibold text-left transition-colors ${
             editionPreset === 'set1_ed2'
               ? 'bg-orange-600 text-white border-orange-700'
@@ -444,7 +464,7 @@ function CardList() {
         </button>
         <button
           type="button"
-          onClick={() => setEditionPreset('set2_ed1')}
+          onClick={() => applyEditionPreset('set2_ed1')}
           className={`rounded-lg border px-3 py-2 text-sm font-semibold text-left transition-colors ${
             editionPreset === 'set2_ed1'
               ? 'bg-blue-600 text-white border-blue-700'
@@ -458,7 +478,7 @@ function CardList() {
       <div className="mb-3">
         <button
           type="button"
-          onClick={() => setEditionPreset('')}
+          onClick={() => applyEditionPreset('')}
           className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 border border-gray-300"
         >
           Mostra tutte le edizioni
