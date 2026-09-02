@@ -23,7 +23,18 @@ function isSecondEdition(text: string): boolean {
 }
 
 function normalizeRarity(value: unknown): string {
-  return String(value ?? '').trim().toUpperCase();
+  return String(value ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
+}
+
+function canonicalRarity(card: any): string {
+  const raw = normalizeRarity(card?.rarity);
+  const typeText = normalizeText(card?.type);
+  const nameText = normalizeText(card?.name);
+
+  if (raw.includes('CHIBI') || typeText.includes('chibi') || nameText.includes('chibi')) {
+    return 'CHIBI';
+  }
+  return raw;
 }
 
 function matchesEditionPreset(card: any, preset: EditionPreset): boolean {
@@ -76,12 +87,12 @@ function Dashboard() {
     loadAll();
   }, [user]);
 
-  const rarities = Array.from(new Set(cards.map(c => normalizeRarity(c.rarity)).filter(Boolean)));
+  const rarities = Array.from(new Set(cards.map(c => canonicalRarity(c)).filter(Boolean)));
   const versions = Array.from(new Set(cards.map(c => c.version).filter(Boolean)));
 
   const filteredCards = cards.filter(c =>
     matchesEditionPreset(c, editionPreset) &&
-    (!rarityFilter || normalizeRarity(c.rarity) === rarityFilter) &&
+    (!rarityFilter || canonicalRarity(c) === rarityFilter) &&
     (!versionFilter || c.version === versionFilter)
   );
   const set1Ed1Count = cards.filter(c => matchesEditionPreset(c, 'set1_ed1')).length;
