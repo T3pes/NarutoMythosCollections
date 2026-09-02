@@ -23,6 +23,10 @@ function isSecondEdition(text: string): boolean {
   return /\b2\s*ed\b/.test(text) || text.includes('2nd') || text.includes('second') || text.includes('seconda');
 }
 
+function normalizeRarity(value: unknown): string {
+  return String(value ?? '').trim().toUpperCase();
+}
+
 function matchesEditionPreset(card: any, preset: EditionPreset): boolean {
   if (!preset) return true;
 
@@ -327,12 +331,12 @@ function CardList() {
   const set2Ed1Count = cardsForPresetCounters.filter(c => matchesEditionPreset(c, 'set2_ed1')).length;
   const displayCards = tab === 'possedute' ? ownedCards : missingCards;
 
-  const rarities = Array.from(new Set(displayCards.map(c => c.rarity).filter(Boolean)));
+  const rarities = Array.from(new Set(displayCards.map(c => normalizeRarity(c.rarity)).filter(Boolean)));
   const versions = Array.from(new Set(displayCards.map(c => c.version).filter(Boolean)));
   const sets = Array.from(new Set(displayCards.map(c => c.set).filter(Boolean)));
 
   const filtered = displayCards.filter(c =>
-    (!rarityFilter || c.rarity === rarityFilter) &&
+    (!rarityFilter || normalizeRarity(c.rarity) === rarityFilter) &&
     (!versionFilter || c.version === versionFilter) &&
     (!setFilter || c.set === setFilter)
   );
@@ -372,17 +376,17 @@ function CardList() {
   };
 
   // --- Filtri per tabella lista mancanti ---
-  const listRarities = Array.from(new Set(missingCards.map(c => c.rarity).filter(Boolean)));
+  const listRarities = Array.from(new Set(missingCards.map(c => normalizeRarity(c.rarity)).filter(Boolean)));
   const listVersions = Array.from(new Set(missingCards.map(c => c.version).filter(Boolean)));
   const filteredMissingList = missingCards.filter(c =>
-    (!listRarityFilter || c.rarity === listRarityFilter) &&
+    (!listRarityFilter || normalizeRarity(c.rarity) === listRarityFilter) &&
     (!listVersionFilter || c.version === listVersionFilter)
   );
 
-  const pendingRarities = Array.from(new Set(pendingCards.map(c => c.rarity).filter(Boolean)));
+  const pendingRarities = Array.from(new Set(pendingCards.map(c => normalizeRarity(c.rarity)).filter(Boolean)));
   const pendingVersions = Array.from(new Set(pendingCards.map(c => c.version).filter(Boolean)));
   const filteredPendingList = pendingCards.filter(c =>
-    (!pendingRarityFilter || c.rarity === pendingRarityFilter) &&
+    (!pendingRarityFilter || normalizeRarity(c.rarity) === pendingRarityFilter) &&
     (!pendingVersionFilter || c.version === pendingVersionFilter)
   );
   const allFilteredPendingSelected =
