@@ -16,6 +16,7 @@ const USER_CARDS_TABLE_BY_PRESET: Record<Exclude<EditionPreset, ''>, string> = {
   set1_ed2: 'user_cards_2ed',
   set2_ed1: 'user_cards_shiren',
 };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function parseEditionPreset(value: string | null): EditionPreset {
   return value === 'set1_ed1' || value === 'set1_ed2' || value === 'set2_ed1' ? value : '';
@@ -73,10 +74,9 @@ function CardList() {
 
   const rawCardId = (card: any): string => String(card?.serial_id ?? card?.uid ?? card?.id ?? '').trim();
 
-  const dbCardId = (card: any): number | null => {
-    const value = String(card?.id ?? rawCardId(card) ?? '').trim();
-    const parsed = Number.parseInt(value, 10);
-    return Number.isFinite(parsed) ? parsed : null;
+  const dbCardUuid = (card: any): string | null => {
+    const value = String(card?.card_id ?? card?.serial_id ?? '').trim();
+    return UUID_RE.test(value) ? value : null;
   };
 
   const pendingCardKey = (card: any): string => {
@@ -85,7 +85,9 @@ function CardList() {
   };
 
   const isOwnedCard = (card: any): boolean => {
+    const uuid = dbCardUuid(card);
     const raw = rawCardId(card);
+    if (uuid && ownedUuids.has(uuid)) return true;
     if (!raw) return false;
     return ownedUuids.has(raw);
   };
@@ -230,17 +232,16 @@ function CardList() {
 
   const handleAdd = async (card: any) => {
     if (!user) return;
-    const cardUuid = rawCardId(card);
-    const cardId = dbCardId(card);
-    if (!editionPreset || !cardUuid || cardId === null) {
-      setError('Errore aggiunta: card_id non valido per la carta selezionata');
+    const cardUuid = dbCardUuid(card);
+    if (!editionPreset || !cardUuid) {
+      setError('Errore aggiunta: card_id UUID non valido per la carta selezionata');
       return;
     }
     const userCardsTableName = USER_CARDS_TABLE_BY_PRESET[editionPreset];
     const { error: err } = await supabase
       .from(userCardsTableName)
       .upsert(
-        { user_id: user.id, card_uuid: cardUuid, card_id: cardId, version: card.version ?? 'normale' },
+        { user_id: user.id, card_uuid: cardUuid, card_id: cardUuid, version: card.version ?? 'normale' },
         { onConflict: 'user_id,card_uuid' }
       );
     if (!err) {
@@ -297,16 +298,19 @@ function CardList() {
     const userCardsTableName = USER_CARDS_TABLE_BY_PRESET[editionPreset];
     const toInsert = allCards
       .filter(c => selectedPendingUuids.has(pendingCardKey(c)))
-      .map(c => ({
-        user_id: user.id,
-        card_uuid: rawCardId(c),
-        card_id: dbCardId(c),
-        version: c.version ?? 'normale',
-      }))
-      .filter(r => Boolean(r.card_uuid) && r.card_id !== null);
+      .map(c => {
+        const uuid = dbCardUuid(c);
+        return {
+          user_id: user.id,
+          card_uuid: uuid,
+          card_id: uuid,
+          version: c.version ?? 'normale',
+        };
+      })
+      .filter(r => Boolean(r.card_uuid));
 
     if (toInsert.length === 0) {
-      setError('Errore importazione: nessuna carta valida (card_id mancante)');
+      setError('Errore importazione: nessuna carta valida (card_id UUID mancante)');
       setSaving(false);
       return;
     }
