@@ -4,107 +4,116 @@ import { supabase } from '../supabaseClient';
 
 type EditionPreset = 'set1_ed1' | 'set1_ed2' | 'set2_ed1';
 
-function normalizeText(value: unknown): string {
-  return String(value ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-
-function isSecondEdition(text: string): boolean {
-  return /\b2\s*ed\b/.test(text) || text.includes('2nd') || text.includes('second') || text.includes('seconda');
-}
-
-function matchesEditionPreset(card: any, preset: EditionPreset): boolean {
-  const setText = normalizeText(card?.set);
-  const inSet1 = setText.includes('set 1') && setText.includes('konoha');
-  const inSet2 = setText.includes('set 2') && setText.includes('shinobi');
-
-  // Nel DB alcune carte Set 1 non riportano esplicitamente "1 ed".
-  if (preset === 'set1_ed1') return inSet1 && !isSecondEdition(setText);
-  if (preset === 'set1_ed2') return inSet1 && isSecondEdition(setText);
-  // Set 2 nel dataset spesso non espone esplicitamente il marker edizione.
-  if (preset === 'set2_ed1') return inSet2 && !isSecondEdition(setText);
-  return true;
-}
+const EDITION_PRESETS: EditionPreset[] = ['set1_ed1', 'set1_ed2', 'set2_ed1'];
+const TABLE_BY_PRESET: Record<EditionPreset, string> = {
+  set1_ed1: 'cards',
+  set1_ed2: 'cards_2ed',
+  set2_ed1: 'Card_shiren',
+};
 
 function editionPresetLabel(preset: EditionPreset): string {
   if (preset === 'set1_ed1') return 'Set 1: Konoha Shido 1ed';
   if (preset === 'set1_ed2') return 'Set 1: Konoha Shido 2ed';
-  if (preset === 'set2_ed1') return 'Set 2: Shinobi Shiren 1ed';
-  return '';
+  return 'Set 2: Shinobi Shiren 1ed';
 }
-
-const EDITION_PRESETS: EditionPreset[] = ['set1_ed1', 'set1_ed2', 'set2_ed1'];
 
 function Dashboard() {
   const navigate = useNavigate();
   const { collectionId } = useParams<{ collectionId: string }>();
-  const [cards, setCards] = useState<any[]>([]);
+  const [counts, setCounts] = useState<Record<EditionPreset, number>>({
+    set1_ed1: 0,
+    set1_ed2: 0,
+    set2_ed1: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadCards() {
+    async function loadCounts() {
       setLoading(true);
       setError(null);
-      const { data: allCards, error: err1 } = await supabase
-        .from('cards').select('*').order('id', { ascending: true });
-      if (err1) {
-        setError('Errore nel caricamento delle carte');
-        setLoading(false);
-        return;
+
+      const nextCounts: Record<EditionPreset, number> = {
+        set1_ed1: 0,
+        set1_ed2: 0,
+        set2_ed1: 0,
+      };
+
+      for (const preset of EDITION_PRESETS) {
+        const tableName = TABLE_BY_PRESET[preset];
+        const { data, error: tableError } = await supabase.from(tableName).select('id');
+
+        if (tableError) {
+          setError(`Errore nel caricamento tabella ${tableName}`);
+          setLoading(false);
+          return;
+        }
+
+        nextCounts[preset] = data?.length ?? 0;
       }
-      setCards(allCards ?? []);
+
+      setCounts(nextCounts);
       setLoading(false);
     }
-    loadCards();
+
+    loadCounts();
   }, []);
 
-  const countByPreset = (preset: EditionPreset) => cards.filter(card => matchesEditionPreset(card, preset)).length;
-
   const openPreset = (preset: EditionPreset) => {
-    if (!collectionId) return;
+    if (!collectionId) {
+      setError('Collezione non trovata');
+      return;
+    }
     navigate(`/collection/${collectionId}/cards?preset=${preset}`);
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center text-gray-300">
+        Caricamento set...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center text-red-300">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex flex-col items-center justify-center px-4 py-12">
       <div className="text-center mb-10">
         <h1 className="text-4xl font-extrabold text-white tracking-wider mb-2">🃏 Seleziona il set</h1>
-        <p className="text-gray-400 text-sm">Scegli il set e apri la vista completa con filtri e liste</p>
+        <p className="text-gray-400 text-sm">Scegli il set da aprire</p>
       </div>
 
-      {loading && <div className="text-gray-300">Caricamento set...</div>}
-      {error && <div className="text-red-300">{error}</div>}
-
-      {!loading && !error && (
-        <div className="flex flex-wrap gap-8 justify-center">
-          {EDITION_PRESETS.map(preset => (
+      <div className="flex flex-wrap gap-8 justify-center">
+        {EDITION_PRESETS.map(preset => {
+          const isSet2 = preset === 'set2_ed1';
+          return (
             <button
               key={preset}
               onClick={() => openPreset(preset)}
               className={`group relative flex flex-col items-center bg-white rounded-2xl shadow-lg hover:shadow-2xl border-2 border-transparent transition-all duration-200 overflow-hidden w-64 cursor-pointer ${
-                preset === 'set2_ed1' ? 'hover:border-blue-400' : 'hover:border-orange-400'
+                isSet2 ? 'hover:border-blue-400' : 'hover:border-orange-400'
               }`}
             >
-              <div className={`w-full px-4 py-8 text-center ${preset === 'set2_ed1' ? 'bg-blue-50' : 'bg-orange-50'}`}>
+              <div className={`w-full px-4 py-8 text-center ${isSet2 ? 'bg-blue-50' : 'bg-orange-50'}`}>
                 <h2 className="text-lg font-bold text-gray-800 mb-1">{editionPresetLabel(preset)}</h2>
-                <p className={`text-sm font-semibold ${preset === 'set2_ed1' ? 'text-blue-700' : 'text-orange-700'}`}>
-                  {countByPreset(preset)} carte
+                <p className={`text-sm font-semibold ${isSet2 ? 'text-blue-700' : 'text-orange-700'}`}>
+                  {counts[preset]} carte
                 </p>
               </div>
               <div className="absolute top-3 right-3 bg-orange-500 text-white text-xs font-semibold px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                 Apri →
               </div>
             </button>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -6,24 +6,14 @@ import { useAuth } from '../auth/AuthContext';
 type Tab = 'tutte_set' | 'possedute' | 'mancanti' | 'lista' | 'in_arrivo';
 type EditionPreset = '' | 'set1_ed1' | 'set1_ed2' | 'set2_ed1';
 const SET1_ED1_RARITY_ORDER = ['L', 'M', 'S', 'SV', 'U', 'UC', 'MISSION'];
+const TABLE_BY_PRESET: Record<Exclude<EditionPreset, ''>, string> = {
+  set1_ed1: 'cards',
+  set1_ed2: 'cards_2ed',
+  set2_ed1: 'Card_shiren',
+};
 
 function parseEditionPreset(value: string | null): EditionPreset {
   return value === 'set1_ed1' || value === 'set1_ed2' || value === 'set2_ed1' ? value : '';
-}
-
-function normalizeText(value: unknown): string {
-  return String(value ?? '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[_-]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-
-function isSecondEdition(text: string): boolean {
-  return /\b2\s*ed\b/.test(text) || text.includes('2nd') || text.includes('second') || text.includes('seconda');
 }
 
 function normalizeRarity(value: unknown): string {
@@ -42,21 +32,6 @@ function rarityOptionsFor(cards: any[], preset: EditionPreset): string[] {
     return [...ordered, ...extras];
   }
   return presentRarities;
-}
-
-function matchesEditionPreset(card: any, preset: EditionPreset): boolean {
-  if (!preset) return true;
-
-  const setText = normalizeText(card?.set);
-  const inSet1 = setText.includes('set 1') && setText.includes('konoha');
-  const inSet2 = setText.includes('set 2') && setText.includes('shinobi');
-
-  // Nel DB alcune carte Set 1 non riportano esplicitamente "1 ed".
-  if (preset === 'set1_ed1') return inSet1 && !isSecondEdition(setText);
-  if (preset === 'set1_ed2') return inSet1 && isSecondEdition(setText);
-  // Set 2 nel dataset spesso non espone esplicitamente il marker edizione.
-  if (preset === 'set2_ed1') return inSet2 && !isSecondEdition(setText);
-  return true;
 }
 
 function editionPresetLabel(preset: EditionPreset): string {
@@ -96,15 +71,29 @@ function CardList() {
   }, [presetFromUrl]);
 
   useEffect(() => {
+    if (!presetFromUrl) {
+      navigate(collectionId ? `/collection/${collectionId}` : '/', { replace: true });
+    }
+  }, [collectionId, navigate, presetFromUrl]);
+
+  useEffect(() => {
     async function load() {
+      if (!editionPreset) {
+        setAllCards([]);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
 
+      const tableName = TABLE_BY_PRESET[editionPreset];
+
       const { data: cards, error: err1 } = await supabase
-        .from('cards')
+        .from(tableName)
         .select('*')
         .order('id', { ascending: true });
-      if (err1) { setError('Errore caricamento carte'); setLoading(false); return; }
+      if (err1) { setError(`Errore caricamento carte (${tableName})`); setLoading(false); return; }
       setAllCards(cards ?? []);
 
       if (!user) { setOwnedUuids(new Set()); setLoading(false); return; }
@@ -175,7 +164,7 @@ function CardList() {
       setLoading(false);
     }
     load();
-  }, [user]);
+  }, [editionPreset, user]);
 
   useEffect(() => {
     if (!user || useSupabasePending) return;
@@ -342,10 +331,10 @@ function CardList() {
   const missingCardsAll = allCards.filter(c => !ownedUuids.has(c.serial_id));
   const pendingCardsAll = allCards.filter(c => pendingUuids.has(c.serial_id) && !ownedUuids.has(c.serial_id));
 
-  const setCards = allCards.filter(c => matchesEditionPreset(c, editionPreset));
-  const ownedCards = ownedCardsAll.filter(c => matchesEditionPreset(c, editionPreset));
-  const missingCards = missingCardsAll.filter(c => matchesEditionPreset(c, editionPreset));
-  const pendingCards = pendingCardsAll.filter(c => matchesEditionPreset(c, editionPreset));
+  const setCards = allCards;
+  const ownedCards = ownedCardsAll;
+  const missingCards = missingCardsAll;
+  const pendingCards = pendingCardsAll;
 
   const displayCards = tab === 'tutte_set' ? setCards : (tab === 'possedute' ? ownedCards : missingCards);
 
