@@ -177,7 +177,7 @@ function CardList() {
             const mergedPending = Array.from(new Set([...Array.from(remotePending), ...localPending]));
 
             if (mergedPending.length > 0) {
-              const rows = mergedPending.map(cardUuid => ({ user_id: user.id, card_uuid: cardUuid }));
+              const rows = mergedPending.map(cardUuid => ({ user_id: user.id, card_uuid: cardUuid, card_id: cardUuid }));
               const { error: migrateErr } = await supabase
                 .from('pending_cards')
                 .upsert(rows, { onConflict: 'user_id,card_uuid' });
@@ -272,7 +272,7 @@ function CardList() {
 
     if (user && useSupabasePending) {
       setSaving(true);
-      const rows = toMove.map(cardUuid => ({ user_id: user.id, card_uuid: cardUuid }));
+      const rows = toMove.map(cardUuid => ({ user_id: user.id, card_uuid: cardUuid, card_id: cardUuid }));
       const { error: err } = await supabase
         .from('pending_cards')
         .upsert(rows, { onConflict: 'user_id,card_uuid' });
@@ -300,7 +300,7 @@ function CardList() {
       setSaving(true);
       const { error: err } = await supabase
         .from('pending_cards')
-        .upsert([{ user_id: user.id, card_uuid: cardUuid }], { onConflict: 'user_id,card_uuid' });
+        .upsert([{ user_id: user.id, card_uuid: cardUuid, card_id: cardUuid }], { onConflict: 'user_id,card_uuid' });
       if (err) {
         console.error('Errore inserimento singolo in attesa:', err);
         setError(`Errore in attesa (pending_cards): ${err.message}`);
