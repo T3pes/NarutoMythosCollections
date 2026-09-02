@@ -402,7 +402,7 @@ card_number,name,image_url,rarity,category,set_name
 
 La lista ufficiale può essere compilata partendo dalla checklist ufficiale della collezione.
 
-usare il link https://capsulecorpgear.com/naruto-mythos-card-list/
+usare il link https://www.narutotcgmythos.com/it/card-gallery o https://capsulecorpgear.com/naruto-mythos-card-list/ 
 per avere le img della collezione, e poi caricarle su Supabase Storage o usare URL pubblici se concessi.
 
 Nota importante sulle immagini:

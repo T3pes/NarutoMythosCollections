@@ -2,6 +2,35 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../auth/AuthContext';
 
+type EditionPreset = '' | 'set1_ed1' | 'set1_ed2' | 'set2_ed1';
+
+function normalizeText(value: unknown): string {
+  return String(value ?? '').toLowerCase().trim();
+}
+
+function isFirstEdition(text: string): boolean {
+  return text.includes('1st') || text.includes('1ed') || text.includes('first') || text.includes('prima');
+}
+
+function isSecondEdition(text: string): boolean {
+  return text.includes('2nd') || text.includes('2ed') || text.includes('second') || text.includes('seconda');
+}
+
+function matchesEditionPreset(card: any, preset: EditionPreset): boolean {
+  if (!preset) return true;
+
+  const setText = normalizeText(card?.set);
+  const editionText = normalizeText(card?.edition);
+  const merged = `${setText} ${editionText}`;
+  const inSet1 = setText.includes('set 1') && (setText.includes('konoha') || setText.includes('shido'));
+  const inSet2 = setText.includes('set 2') && (setText.includes('shinobi') || setText.includes('shiren'));
+
+  if (preset === 'set1_ed1') return inSet1 && isFirstEdition(merged);
+  if (preset === 'set1_ed2') return inSet1 && isSecondEdition(merged);
+  if (preset === 'set2_ed1') return inSet2 && isFirstEdition(merged);
+  return true;
+}
+
 function Dashboard() {
   const { user } = useAuth();
   const [cards, setCards] = useState<any[]>([]);
@@ -10,6 +39,7 @@ function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [rarityFilter, setRarityFilter] = useState<string>('');
   const [versionFilter, setVersionFilter] = useState<string>('');
+  const [editionPreset, setEditionPreset] = useState<EditionPreset>('');
   const [selectedCards, setSelectedCards] = useState<string[]>([]);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'ok' | 'error'>('idle');
 
@@ -34,6 +64,7 @@ function Dashboard() {
   const versions = Array.from(new Set(cards.map(c => c.version).filter(Boolean)));
 
   const filteredCards = cards.filter(c =>
+    matchesEditionPreset(c, editionPreset) &&
     (!rarityFilter || c.rarity === rarityFilter) &&
     (!versionFilter || c.version === versionFilter)
   );
@@ -94,6 +125,41 @@ function Dashboard() {
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Tutte le carte</h1>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+        <button
+          type="button"
+          onClick={() => setEditionPreset('set1_ed1')}
+          className={`rounded-lg border px-3 py-2 text-sm font-semibold text-left transition-colors ${
+            editionPreset === 'set1_ed1'
+              ? 'bg-orange-600 text-white border-orange-700'
+              : 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100'
+          }`}
+        >
+          Set 1: Konoha Shido 1ed
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditionPreset('set1_ed2')}
+          className={`rounded-lg border px-3 py-2 text-sm font-semibold text-left transition-colors ${
+            editionPreset === 'set1_ed2'
+              ? 'bg-orange-600 text-white border-orange-700'
+              : 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100'
+          }`}
+        >
+          Set 1: Konoha Shido 2ed
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditionPreset('set2_ed1')}
+          className={`rounded-lg border px-3 py-2 text-sm font-semibold text-left transition-colors ${
+            editionPreset === 'set2_ed1'
+              ? 'bg-blue-600 text-white border-blue-700'
+              : 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
+          }`}
+        >
+          Set 2: Shinobi Shiren 1ed
+        </button>
+      </div>
       <div className="flex flex-wrap gap-4 mb-4 items-center">
         <label className="text-sm">
           Rarità:
@@ -109,6 +175,12 @@ function Dashboard() {
             {versions.map(v => <option key={v} value={v}>{v}</option>)}
           </select>
         </label>
+        <button
+          className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 border border-gray-300"
+          onClick={() => setEditionPreset('')}
+        >
+          Mostra tutte le edizioni
+        </button>
         <button
           className="ml-2 px-2 py-1 text-xs bg-orange-600 text-white rounded hover:bg-orange-700 border border-orange-300"
           onClick={handleSelectAll}
