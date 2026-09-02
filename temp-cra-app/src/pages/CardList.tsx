@@ -259,7 +259,17 @@ function CardList() {
 
   const handleMoveSelectedToPending = async () => {
     if (selectedUuids.size === 0) return;
-    const toMove = Array.from(selectedUuids);
+    const selectedKeys = Array.from(selectedUuids);
+    const toMove = allCards
+      .filter(card => selectedKeys.includes(pendingCardKey(card)))
+      .map(card => dbCardUuid(card))
+      .filter((uuid): uuid is string => Boolean(uuid));
+
+    if (toMove.length === 0) {
+      setError('Errore in attesa: nessuna carta selezionata con UUID valido');
+      return;
+    }
+
     if (user && useSupabasePending) {
       setSaving(true);
       const rows = toMove.map(cardUuid => ({ user_id: user.id, card_uuid: cardUuid }));
@@ -268,6 +278,7 @@ function CardList() {
         .upsert(rows, { onConflict: 'user_id,card_uuid' });
       if (err) {
         console.error('Errore inserimento in attesa:', err);
+        setError(`Errore in attesa (pending_cards): ${err.message}`);
         setSaving(false);
         return;
       }
@@ -278,7 +289,12 @@ function CardList() {
     setTab('in_arrivo');
   };
 
-  const handleMoveSingleToPending = async (cardUuid: string) => {
+  const handleMoveSingleToPending = async (card: any) => {
+    const cardUuid = dbCardUuid(card);
+    if (!cardUuid) {
+      setError('Errore in attesa: UUID carta non valido');
+      return;
+    }
     if (pendingUuids.has(cardUuid)) return;
     if (user && useSupabasePending) {
       setSaving(true);
@@ -287,6 +303,7 @@ function CardList() {
         .upsert([{ user_id: user.id, card_uuid: cardUuid }], { onConflict: 'user_id,card_uuid' });
       if (err) {
         console.error('Errore inserimento singolo in attesa:', err);
+        setError(`Errore in attesa (pending_cards): ${err.message}`);
         setSaving(false);
         return;
       }
@@ -648,7 +665,7 @@ function CardList() {
                           <span className="text-yellow-700 text-xs font-semibold">in attesa</span>
                         ) : (
                           <button
-                            onClick={() => handleMoveSingleToPending(cardUuid)}
+                            onClick={() => handleMoveSingleToPending(card)}
                             disabled={saving}
                             className="text-amber-600 hover:text-amber-800 text-lg font-bold leading-none disabled:opacity-40"
                             title="Metti in attesa di arrivo"
