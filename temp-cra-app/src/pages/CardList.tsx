@@ -80,8 +80,12 @@ function CardList() {
   };
 
   const pendingCardKey = (card: any): string => {
+    return dbCardUuid(card) ?? rawCardId(card);
+  };
+
+  const legacyScopedPendingCardKey = (card: any): string => {
     const raw = rawCardId(card);
-    return editionPreset && raw ? `${editionPreset}:${raw}` : raw;
+    return editionPreset && raw ? `${editionPreset}:${raw}` : '';
   };
 
   const isOwnedCard = (card: any): boolean => {
@@ -94,9 +98,10 @@ function CardList() {
 
   const isPendingCard = (card: any): boolean => {
     const raw = rawCardId(card);
-    const scoped = pendingCardKey(card);
+    const key = pendingCardKey(card);
+    const legacyScoped = legacyScopedPendingCardKey(card);
     if (!raw) return false;
-    return pendingUuids.has(scoped) || pendingUuids.has(raw);
+    return pendingUuids.has(key) || pendingUuids.has(raw) || (legacyScoped ? pendingUuids.has(legacyScoped) : false);
   };
 
   useEffect(() => {
