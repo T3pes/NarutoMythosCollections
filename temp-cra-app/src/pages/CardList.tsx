@@ -11,6 +11,11 @@ const TABLE_BY_PRESET: Record<Exclude<EditionPreset, ''>, string> = {
   set1_ed2: 'cards_2ed',
   set2_ed1: 'Card_shiren',
 };
+const USER_CARDS_TABLE_BY_PRESET: Record<Exclude<EditionPreset, ''>, string> = {
+  set1_ed1: 'user_cards',
+  set1_ed2: 'user_cards_2ed',
+  set2_ed1: 'user_cards_shiren',
+};
 
 function parseEditionPreset(value: string | null): EditionPreset {
   return value === 'set1_ed1' || value === 'set1_ed2' || value === 'set2_ed1' ? value : '';
@@ -66,27 +71,24 @@ function CardList() {
   const [pendingSyncWarning, setPendingSyncWarning] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  const allowLegacyRawUuid = editionPreset === 'set1_ed1';
-
   const rawCardId = (card: any): string => String(card?.serial_id ?? card?.uid ?? card?.id ?? '').trim();
 
-  const scopedCardUuid = (card: any): string => {
+  const pendingCardKey = (card: any): string => {
     const raw = rawCardId(card);
     return editionPreset && raw ? `${editionPreset}:${raw}` : raw;
   };
 
   const isOwnedCard = (card: any): boolean => {
     const raw = rawCardId(card);
-    const scoped = scopedCardUuid(card);
     if (!raw) return false;
-    return ownedUuids.has(scoped) || (allowLegacyRawUuid && ownedUuids.has(raw));
+    return ownedUuids.has(raw);
   };
 
   const isPendingCard = (card: any): boolean => {
     const raw = rawCardId(card);
-    const scoped = scopedCardUuid(card);
+    const scoped = pendingCardKey(card);
     if (!raw) return false;
-    return pendingUuids.has(scoped) || (allowLegacyRawUuid && pendingUuids.has(raw));
+    return pendingUuids.has(scoped) || pendingUuids.has(raw);
   };
 
   useEffect(() => {
@@ -111,6 +113,7 @@ function CardList() {
       setError(null);
 
       const tableName = TABLE_BY_PRESET[editionPreset];
+      const userCardsTableName = USER_CARDS_TABLE_BY_PRESET[editionPreset];
 
       const { data: cards, error: err1 } = await supabase
         .from(tableName)
@@ -122,11 +125,11 @@ function CardList() {
       if (!user) { setOwnedUuids(new Set()); setLoading(false); return; }
 
       const { data: uc, error: err2 } = await supabase
-        .from('user_cards')
+        .from(userCardsTableName)
         .select('card_uuid')
         .eq('user_id', user.id);
       if (err2) { setError('Errore caricamento collezione'); setLoading(false); return; }
-      setOwnedUuids(new Set((uc ?? []).map((r: any) => r.card_uuid)));
+      setOwnedUuids(new Set((uc ?? []).map((r: any) => String(r.card_uuid ?? '').trim()).filter(Boolean)));
 
       const { data: pc, error: err3 } = await supabase
         .from('pending_cards')
@@ -201,32 +204,31 @@ function CardList() {
   const handleRemove = async (card: any) => {
     if (!user) return;
     const raw = rawCardId(card);
-    const scoped = scopedCardUuid(card);
-    const uuidsToDelete = [scoped, ...(allowLegacyRawUuid && raw ? [raw] : [])];
-
-    for (const cardUuid of uuidsToDelete) {
-      const { error: err } = await supabase
-        .from('user_cards')
-        .delete()
-        .match({ user_id: user.id, card_uuid: cardUuid });
-      if (err) {
-        console.error('Errore rimozione:', err);
-      }
+    if (!editionPreset || !raw) return;
+    const userCardsTableName = USER_CARDS_TABLE_BY_PRESET[editionPreset];
+    const { error: err } = await supabase
+      .from(userCardsTableName)
+      .delete()
+      .match({ user_id: user.id, card_uuid: raw });
+    if (err) {
+      console.error('Errore rimozione:', err);
+      return;
     }
 
     setOwnedUuids(prev => {
       const next = new Set(Array.from(prev));
-      uuidsToDelete.forEach(uuid => next.delete(uuid));
+      next.delete(raw);
       return next;
     });
   };
 
   const handleAdd = async (card: any) => {
     if (!user) return;
-    const cardUuid = scopedCardUuid(card);
-    if (!cardUuid) return;
+    const cardUuid = rawCardId(card);
+    if (!editionPreset || !cardUuid) return;
+    const userCardsTableName = USER_CARDS_TABLE_BY_PRESET[editionPreset];
     const { error: err } = await supabase
-      .from('user_cards')
+      .from(userCardsTableName)
       .insert({ user_id: user.id, card_uuid: cardUuid, version: card.version ?? 'normale' });
     if (!err) {
       setOwnedUuids(prev => new Set(Array.from(prev).concat(cardUuid)));
@@ -275,13 +277,15 @@ function CardList() {
 
   const handleImportPendingToOwned = async () => {
     if (!user || selectedPendingUuids.size === 0) return;
+    if (!editionPreset) return;
     setSaving(true);
     const selectedPending = Array.from(selectedPendingUuids);
+    const userCardsTableName = USER_CARDS_TABLE_BY_PRESET[editionPreset];
     const toInsert = allCards
-      .filter(c => selectedPendingUuids.has(scopedCardUuid(c)))
-      .map(c => ({ user_id: user.id, card_uuid: scopedCardUuid(c), version: c.version ?? 'normale' }))
+      .filter(c => selectedPendingUuids.has(pendingCardKey(c)))
+      .map(c => ({ user_id: user.id, card_uuid: rawCardId(c), version: c.version ?? 'normale' }))
       .filter(r => Boolean(r.card_uuid));
-    const { error: err } = await supabase.from('user_cards').insert(toInsert);
+    const { error: err } = await supabase.from(userCardsTableName).insert(toInsert);
     if (!err) {
       if (useSupabasePending) {
         const { error: pendingDeleteErr } = await supabase
@@ -334,11 +338,11 @@ function CardList() {
 
   const toggleSelectAll = (cards: any[]) => {
     const selectableCards = cards.filter(c => !isPendingCard(c));
-    const allSelected = selectableCards.length > 0 && selectableCards.every(c => selectedUuids.has(scopedCardUuid(c)));
+    const allSelected = selectableCards.length > 0 && selectableCards.every(c => selectedUuids.has(pendingCardKey(c)));
     if (allSelected) {
       setSelectedUuids(new Set());
     } else {
-      setSelectedUuids(new Set(selectableCards.map(c => scopedCardUuid(c)).filter(Boolean)));
+      setSelectedUuids(new Set(selectableCards.map(c => pendingCardKey(c)).filter(Boolean)));
     }
   };
 
@@ -351,11 +355,11 @@ function CardList() {
   };
 
   const togglePendingSelectAll = (cards: any[]) => {
-    const allSelected = cards.every(c => selectedPendingUuids.has(scopedCardUuid(c)));
+    const allSelected = cards.every(c => selectedPendingUuids.has(pendingCardKey(c)));
     if (allSelected) {
       setSelectedPendingUuids(new Set());
     } else {
-      setSelectedPendingUuids(new Set(cards.map(c => scopedCardUuid(c)).filter(Boolean)));
+      setSelectedPendingUuids(new Set(cards.map(c => pendingCardKey(c)).filter(Boolean)));
     }
   };
 
@@ -426,7 +430,7 @@ function CardList() {
     (!pendingVersionFilter || c.version === pendingVersionFilter)
   );
   const allFilteredPendingSelected =
-    filteredPendingList.length > 0 && filteredPendingList.every(c => selectedPendingUuids.has(scopedCardUuid(c)));
+    filteredPendingList.length > 0 && filteredPendingList.every(c => selectedPendingUuids.has(pendingCardKey(c)));
 
   const openTab = (nextTab: Tab) => {
     setTab(nextTab);
@@ -549,7 +553,7 @@ function CardList() {
                     <th className="px-3 py-2 w-8">
                       <input
                         type="checkbox"
-                          checked={filteredMissingList.length > 0 && filteredMissingList.every(c => selectedUuids.has(scopedCardUuid(c)))}
+                          checked={filteredMissingList.length > 0 && filteredMissingList.every(c => selectedUuids.has(pendingCardKey(c)))}
                         onChange={() => toggleSelectAll(filteredMissingList)}
                         title="Seleziona tutti"
                       />
@@ -567,7 +571,7 @@ function CardList() {
                 <tbody>
                   {filteredMissingList.map((card, i) => (
                     (() => {
-                      const cardUuid = scopedCardUuid(card);
+                      const cardUuid = pendingCardKey(card);
                       const isPending = isPendingCard(card);
                       return (
                     <tr
@@ -683,14 +687,14 @@ function CardList() {
                   <tbody>
                     {filteredPendingList.map((card, i) => (
                       <tr
-                        key={scopedCardUuid(card)}
-                        className={`border-b border-gray-100 ${selectedPendingUuids.has(scopedCardUuid(card)) ? 'bg-yellow-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-orange-50`}
+                        key={pendingCardKey(card)}
+                        className={`border-b border-gray-100 ${selectedPendingUuids.has(pendingCardKey(card)) ? 'bg-yellow-50' : i % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-orange-50`}
                       >
                         <td className="px-3 py-2 text-center">
                           <input
                             type="checkbox"
-                            checked={selectedPendingUuids.has(scopedCardUuid(card))}
-                            onChange={() => togglePendingSelect(scopedCardUuid(card))}
+                            checked={selectedPendingUuids.has(pendingCardKey(card))}
+                            onChange={() => togglePendingSelect(pendingCardKey(card))}
                           />
                         </td>
                         <td className="px-3 py-2 text-gray-400 text-xs">{card.id}</td>
@@ -778,7 +782,7 @@ function CardList() {
             )}
             {filtered.map(card => (
               <article
-                key={scopedCardUuid(card)}
+                key={pendingCardKey(card) || rawCardId(card)}
                 className={`border-2 rounded-lg p-3 bg-white flex flex-col items-center ${
                   tab === 'possedute' ? 'border-green-500' : tab === 'mancanti' ? 'border-red-300 opacity-80' : 'border-indigo-300'
                 }`}
