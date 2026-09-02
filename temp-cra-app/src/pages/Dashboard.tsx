@@ -15,11 +15,11 @@ function normalizeText(value: unknown): string {
 }
 
 function isFirstEdition(text: string): boolean {
-  return text.includes('1st') || text.includes('1ed') || text.includes('first') || text.includes('prima');
+  return /\b1\s*ed\b/.test(text) || text.includes('1st') || text.includes('first') || text.includes('prima');
 }
 
 function isSecondEdition(text: string): boolean {
-  return text.includes('2nd') || text.includes('2ed') || text.includes('second') || text.includes('seconda');
+  return /\b2\s*ed\b/.test(text) || text.includes('2nd') || text.includes('second') || text.includes('seconda');
 }
 
 function matchesEditionPreset(card: any, preset: EditionPreset): boolean {
@@ -72,6 +72,9 @@ function Dashboard() {
     (!rarityFilter || c.rarity === rarityFilter) &&
     (!versionFilter || c.version === versionFilter)
   );
+  const set1Ed1Count = cards.filter(c => matchesEditionPreset(c, 'set1_ed1')).length;
+  const set1Ed2Count = cards.filter(c => matchesEditionPreset(c, 'set1_ed2')).length;
+  const set2Ed1Count = cards.filter(c => matchesEditionPreset(c, 'set2_ed1')).length;
 
   const handleSelectAll = () => {
     const currentIds = filteredCards.map(c => c.serial_id).filter(Boolean);
@@ -139,7 +142,7 @@ function Dashboard() {
               : 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100'
           }`}
         >
-          Set 1: Konoha Shido 1ed
+          Set 1: Konoha Shido 1ed ({set1Ed1Count})
         </button>
         <button
           type="button"
@@ -150,7 +153,7 @@ function Dashboard() {
               : 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100'
           }`}
         >
-          Set 1: Konoha Shido 2ed
+          Set 1: Konoha Shido 2ed ({set1Ed2Count})
         </button>
         <button
           type="button"
@@ -161,7 +164,7 @@ function Dashboard() {
               : 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
           }`}
         >
-          Set 2: Shinobi Shiren 1ed
+          Set 2: Shinobi Shiren 1ed ({set2Ed1Count})
         </button>
       </div>
       <div className="flex flex-wrap gap-4 mb-4 items-center">

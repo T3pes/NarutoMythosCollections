@@ -16,11 +16,11 @@ function normalizeText(value: unknown): string {
 }
 
 function isFirstEdition(text: string): boolean {
-  return text.includes('1st') || text.includes('1ed') || text.includes('first') || text.includes('prima');
+  return /\b1\s*ed\b/.test(text) || text.includes('1st') || text.includes('first') || text.includes('prima');
 }
 
 function isSecondEdition(text: string): boolean {
-  return text.includes('2nd') || text.includes('2ed') || text.includes('second') || text.includes('seconda');
+  return /\b2\s*ed\b/.test(text) || text.includes('2nd') || text.includes('second') || text.includes('seconda');
 }
 
 function matchesEditionPreset(card: any, preset: EditionPreset): boolean {
@@ -304,6 +304,9 @@ function CardList() {
   const ownedCards = allCards.filter(c => ownedUuids.has(c.serial_id) && matchesEditionPreset(c, editionPreset));
   const missingCards = allCards.filter(c => !ownedUuids.has(c.serial_id) && matchesEditionPreset(c, editionPreset));
   const pendingCards = allCards.filter(c => pendingUuids.has(c.serial_id) && !ownedUuids.has(c.serial_id) && matchesEditionPreset(c, editionPreset));
+  const set1Ed1Count = allCards.filter(c => matchesEditionPreset(c, 'set1_ed1')).length;
+  const set1Ed2Count = allCards.filter(c => matchesEditionPreset(c, 'set1_ed2')).length;
+  const set2Ed1Count = allCards.filter(c => matchesEditionPreset(c, 'set2_ed1')).length;
   const displayCards = tab === 'possedute' ? ownedCards : missingCards;
 
   const rarities = Array.from(new Set(displayCards.map(c => c.rarity).filter(Boolean)));
@@ -393,7 +396,7 @@ function CardList() {
               : 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100'
           }`}
         >
-          Set 1: Konoha Shido 1ed
+          Set 1: Konoha Shido 1ed ({set1Ed1Count})
         </button>
         <button
           type="button"
@@ -404,7 +407,7 @@ function CardList() {
               : 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100'
           }`}
         >
-          Set 1: Konoha Shido 2ed
+          Set 1: Konoha Shido 2ed ({set1Ed2Count})
         </button>
         <button
           type="button"
@@ -415,7 +418,7 @@ function CardList() {
               : 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
           }`}
         >
-          Set 2: Shinobi Shiren 1ed
+          Set 2: Shinobi Shiren 1ed ({set2Ed1Count})
         </button>
       </div>
 
