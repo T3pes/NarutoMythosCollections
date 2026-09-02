@@ -5,15 +5,11 @@ import { supabase } from '../supabaseClient';
 type EditionPreset = 'set1_ed1' | 'set1_ed2' | 'set2_ed1';
 
 const EDITION_PRESETS: EditionPreset[] = ['set1_ed1', 'set1_ed2', 'set2_ed1'];
-const SOURCE_BY_PRESET: Record<EditionPreset, string> = {
+const TABLE_BY_PRESET: Record<EditionPreset, string> = {
   set1_ed1: 'cards',
   set1_ed2: 'cards_2ed',
   set2_ed1: 'Card_shiren',
 };
-
-function rowSource(row: any): string {
-  return String(row?.surce ?? row?.source ?? '').trim().toLowerCase();
-}
 
 function editionPresetLabel(preset: EditionPreset): string {
   if (preset === 'set1_ed1') return 'Set 1: Konoha Shido 1ed';
@@ -43,20 +39,17 @@ function Dashboard() {
         set2_ed1: 0,
       };
 
-      const { data, error: tableError } = await supabase
-        .from('card_catalog')
-        .select('*');
-
-      if (tableError) {
-        setError('Errore nel caricamento catalogo carte');
-        setLoading(false);
-        return;
-      }
-
-      const rows = data ?? [];
       for (const preset of EDITION_PRESETS) {
-        const sourceName = SOURCE_BY_PRESET[preset].toLowerCase();
-        nextCounts[preset] = rows.filter(row => rowSource(row) === sourceName).length;
+        const tableName = TABLE_BY_PRESET[preset];
+        const { data, error: tableError } = await supabase.from(tableName).select('id');
+
+        if (tableError) {
+          setError(`Errore nel caricamento tabella ${tableName}`);
+          setLoading(false);
+          return;
+        }
+
+        nextCounts[preset] = data?.length ?? 0;
       }
 
       setCounts(nextCounts);

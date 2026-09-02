@@ -6,15 +6,11 @@ import { useAuth } from '../auth/AuthContext';
 type Tab = 'tutte_set' | 'possedute' | 'mancanti' | 'lista' | 'in_arrivo';
 type EditionPreset = '' | 'set1_ed1' | 'set1_ed2' | 'set2_ed1';
 const SET1_ED1_RARITY_ORDER = ['L', 'M', 'S', 'SV', 'U', 'UC', 'MISSION'];
-const SOURCE_BY_PRESET: Record<Exclude<EditionPreset, ''>, string> = {
+const TABLE_BY_PRESET: Record<Exclude<EditionPreset, ''>, string> = {
   set1_ed1: 'cards',
   set1_ed2: 'cards_2ed',
   set2_ed1: 'Card_shiren',
 };
-
-function rowSource(row: any): string {
-  return String(row?.surce ?? row?.source ?? '').trim().toLowerCase();
-}
 
 function parseEditionPreset(value: string | null): EditionPreset {
   return value === 'set1_ed1' || value === 'set1_ed2' || value === 'set2_ed1' ? value : '';
@@ -91,15 +87,14 @@ function CardList() {
       setLoading(true);
       setError(null);
 
-      const sourceName = SOURCE_BY_PRESET[editionPreset].toLowerCase();
+      const tableName = TABLE_BY_PRESET[editionPreset];
 
       const { data: cards, error: err1 } = await supabase
-        .from('card_catalog')
+        .from(tableName)
         .select('*')
         .order('id', { ascending: true });
-      if (err1) { setError(`Errore caricamento carte (${sourceName})`); setLoading(false); return; }
-      const filteredBySource = (cards ?? []).filter(card => rowSource(card) === sourceName);
-      setAllCards(filteredBySource);
+      if (err1) { setError(`Errore caricamento carte (${tableName})`); setLoading(false); return; }
+      setAllCards(cards ?? []);
 
       if (!user) { setOwnedUuids(new Set()); setLoading(false); return; }
 
