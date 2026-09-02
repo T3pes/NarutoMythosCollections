@@ -12,6 +12,10 @@ const SOURCE_BY_PRESET: Record<Exclude<EditionPreset, ''>, string> = {
   set2_ed1: 'Card_shiren',
 };
 
+function rowSource(row: any): string {
+  return String(row?.surce ?? row?.source ?? '').trim().toLowerCase();
+}
+
 function parseEditionPreset(value: string | null): EditionPreset {
   return value === 'set1_ed1' || value === 'set1_ed2' || value === 'set2_ed1' ? value : '';
 }
@@ -87,15 +91,15 @@ function CardList() {
       setLoading(true);
       setError(null);
 
-      const sourceName = SOURCE_BY_PRESET[editionPreset];
+      const sourceName = SOURCE_BY_PRESET[editionPreset].toLowerCase();
 
       const { data: cards, error: err1 } = await supabase
         .from('card_catalog')
         .select('*')
-        .eq('surce', sourceName)
         .order('id', { ascending: true });
       if (err1) { setError(`Errore caricamento carte (${sourceName})`); setLoading(false); return; }
-      setAllCards(cards ?? []);
+      const filteredBySource = (cards ?? []).filter(card => rowSource(card) === sourceName);
+      setAllCards(filteredBySource);
 
       if (!user) { setOwnedUuids(new Set()); setLoading(false); return; }
 
