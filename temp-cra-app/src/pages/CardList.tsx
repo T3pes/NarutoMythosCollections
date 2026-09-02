@@ -36,6 +36,13 @@ function matchesEditionPreset(card: any, preset: EditionPreset): boolean {
   return true;
 }
 
+function editionPresetLabel(preset: EditionPreset): string {
+  if (preset === 'set1_ed1') return 'Set 1: Konoha Shido 1ed';
+  if (preset === 'set1_ed2') return 'Set 1: Konoha Shido 2ed';
+  if (preset === 'set2_ed1') return 'Set 2: Shinobi Shiren 1ed';
+  return '';
+}
+
 function CardList() {
   const { user } = useAuth();
   const [allCards, setAllCards] = useState<any[]>([]);
@@ -301,12 +308,22 @@ function CardList() {
     }
   };
 
-  const ownedCards = allCards.filter(c => ownedUuids.has(c.serial_id) && matchesEditionPreset(c, editionPreset));
-  const missingCards = allCards.filter(c => !ownedUuids.has(c.serial_id) && matchesEditionPreset(c, editionPreset));
-  const pendingCards = allCards.filter(c => pendingUuids.has(c.serial_id) && !ownedUuids.has(c.serial_id) && matchesEditionPreset(c, editionPreset));
-  const set1Ed1Count = allCards.filter(c => matchesEditionPreset(c, 'set1_ed1')).length;
-  const set1Ed2Count = allCards.filter(c => matchesEditionPreset(c, 'set1_ed2')).length;
-  const set2Ed1Count = allCards.filter(c => matchesEditionPreset(c, 'set2_ed1')).length;
+  const ownedCardsAll = allCards.filter(c => ownedUuids.has(c.serial_id));
+  const missingCardsAll = allCards.filter(c => !ownedUuids.has(c.serial_id));
+  const pendingCardsAll = allCards.filter(c => pendingUuids.has(c.serial_id) && !ownedUuids.has(c.serial_id));
+
+  const ownedCards = ownedCardsAll.filter(c => matchesEditionPreset(c, editionPreset));
+  const missingCards = missingCardsAll.filter(c => matchesEditionPreset(c, editionPreset));
+  const pendingCards = pendingCardsAll.filter(c => matchesEditionPreset(c, editionPreset));
+
+  const cardsForPresetCounters = tab === 'possedute'
+    ? ownedCardsAll
+    : tab === 'in_arrivo'
+      ? pendingCardsAll
+      : missingCardsAll;
+  const set1Ed1Count = cardsForPresetCounters.filter(c => matchesEditionPreset(c, 'set1_ed1')).length;
+  const set1Ed2Count = cardsForPresetCounters.filter(c => matchesEditionPreset(c, 'set1_ed2')).length;
+  const set2Ed1Count = cardsForPresetCounters.filter(c => matchesEditionPreset(c, 'set2_ed1')).length;
   const displayCards = tab === 'possedute' ? ownedCards : missingCards;
 
   const rarities = Array.from(new Set(displayCards.map(c => c.rarity).filter(Boolean)));
@@ -431,6 +448,14 @@ function CardList() {
           Mostra tutte le edizioni
         </button>
       </div>
+
+      {editionPreset && (
+        <div className="mb-3 flex items-center gap-2 text-xs">
+          <span className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 font-medium text-orange-800">
+            Filtro attivo: {editionPresetLabel(editionPreset)}
+          </span>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-1 border-b border-gray-200 mb-4">

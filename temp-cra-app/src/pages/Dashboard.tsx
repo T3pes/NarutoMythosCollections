@@ -35,6 +35,13 @@ function matchesEditionPreset(card: any, preset: EditionPreset): boolean {
   return true;
 }
 
+function editionPresetLabel(preset: EditionPreset): string {
+  if (preset === 'set1_ed1') return 'Set 1: Konoha Shido 1ed';
+  if (preset === 'set1_ed2') return 'Set 1: Konoha Shido 2ed';
+  if (preset === 'set2_ed1') return 'Set 2: Shinobi Shiren 1ed';
+  return '';
+}
+
 function Dashboard() {
   const { user } = useAuth();
   const [cards, setCards] = useState<any[]>([]);
@@ -167,6 +174,13 @@ function Dashboard() {
           Set 2: Shinobi Shiren 1ed ({set2Ed1Count})
         </button>
       </div>
+      {editionPreset && (
+        <div className="mb-3 flex items-center gap-2 text-xs">
+          <span className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 font-medium text-orange-800">
+            Filtro attivo: {editionPresetLabel(editionPreset)}
+          </span>
+        </div>
+      )}
       <div className="flex flex-wrap gap-4 mb-4 items-center">
         <label className="text-sm">
           Rarità:
