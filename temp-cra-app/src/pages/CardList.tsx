@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../auth/AuthContext';
 
-type Tab = 'possedute' | 'mancanti' | 'lista' | 'in_arrivo';
+type Tab = 'tutte_set' | 'possedute' | 'mancanti' | 'lista' | 'in_arrivo';
 type EditionPreset = '' | 'set1_ed1' | 'set1_ed2' | 'set2_ed1';
+const SET1_ED1_RARITY_ORDER = ['L', 'M', 'S', 'SV', 'U', 'UC', 'MISSION'];
 
 function parseEditionPreset(value: string | null): EditionPreset {
   return value === 'set1_ed1' || value === 'set1_ed2' || value === 'set2_ed1' ? value : '';
@@ -37,10 +38,21 @@ function canonicalRarity(card: any): string {
   const typeText = normalizeText(card?.type);
   const nameText = normalizeText(card?.name);
 
+  if (raw === 'C') {
+    return 'U';
+  }
+
   if (raw.includes('CHIBI') || typeText.includes('chibi') || nameText.includes('chibi')) {
     return 'CHIBI';
   }
   return raw;
+}
+
+function rarityOptionsFor(cards: any[], preset: EditionPreset): string[] {
+  if (preset === 'set1_ed1') {
+    return SET1_ED1_RARITY_ORDER;
+  }
+  return Array.from(new Set(cards.map(c => canonicalRarity(c)).filter(Boolean)));
 }
 
 function matchesEditionPreset(card: any, preset: EditionPreset): boolean {
@@ -61,21 +73,22 @@ function editionPresetLabel(preset: EditionPreset): string {
   if (preset === 'set1_ed1') return 'Set 1: Konoha Shido 1ed';
   if (preset === 'set1_ed2') return 'Set 1: Konoha Shido 2ed';
   if (preset === 'set2_ed1') return 'Set 2: Shinobi Shiren 1ed';
-  return '';
+  return 'Set non selezionato';
 }
 
 function CardList() {
   const { user } = useAuth();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { collectionId } = useParams<{ collectionId: string }>();
+  const [searchParams] = useSearchParams();
   const presetFromUrl = parseEditionPreset(searchParams.get('preset'));
   const [allCards, setAllCards] = useState<any[]>([]);
   const [ownedUuids, setOwnedUuids] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>('possedute');
+  const [tab, setTab] = useState<Tab>('tutte_set');
   const [rarityFilter, setRarityFilter] = useState<string>('');
   const [versionFilter, setVersionFilter] = useState<string>('');
-  const [setFilter, setSetFilter] = useState<string>('');
   const [editionPreset, setEditionPreset] = useState<EditionPreset>(presetFromUrl);
   const [listRarityFilter, setListRarityFilter] = useState('');
   const [listVersionFilter, setListVersionFilter] = useState('');
@@ -91,15 +104,6 @@ function CardList() {
   useEffect(() => {
     setEditionPreset(presetFromUrl);
   }, [presetFromUrl]);
-
-  const applyEditionPreset = (preset: EditionPreset) => {
-    setEditionPreset(preset);
-    if (preset) {
-      setSearchParams({ preset });
-    } else {
-      setSearchParams({});
-    }
-  };
 
   useEffect(() => {
     async function load() {
@@ -348,34 +352,24 @@ function CardList() {
   const missingCardsAll = allCards.filter(c => !ownedUuids.has(c.serial_id));
   const pendingCardsAll = allCards.filter(c => pendingUuids.has(c.serial_id) && !ownedUuids.has(c.serial_id));
 
+  const setCards = allCards.filter(c => matchesEditionPreset(c, editionPreset));
   const ownedCards = ownedCardsAll.filter(c => matchesEditionPreset(c, editionPreset));
   const missingCards = missingCardsAll.filter(c => matchesEditionPreset(c, editionPreset));
   const pendingCards = pendingCardsAll.filter(c => matchesEditionPreset(c, editionPreset));
 
-  const cardsForPresetCounters = tab === 'possedute'
-    ? ownedCardsAll
-    : tab === 'in_arrivo'
-      ? pendingCardsAll
-      : missingCardsAll;
-  const set1Ed1Count = cardsForPresetCounters.filter(c => matchesEditionPreset(c, 'set1_ed1')).length;
-  const set1Ed2Count = cardsForPresetCounters.filter(c => matchesEditionPreset(c, 'set1_ed2')).length;
-  const set2Ed1Count = cardsForPresetCounters.filter(c => matchesEditionPreset(c, 'set2_ed1')).length;
-  const displayCards = tab === 'possedute' ? ownedCards : missingCards;
+  const displayCards = tab === 'tutte_set' ? setCards : (tab === 'possedute' ? ownedCards : missingCards);
 
-  const rarities = Array.from(new Set(displayCards.map(c => canonicalRarity(c)).filter(Boolean)));
+  const rarities = rarityOptionsFor(displayCards, editionPreset);
   const versions = Array.from(new Set(displayCards.map(c => c.version).filter(Boolean)));
-  const sets = Array.from(new Set(displayCards.map(c => c.set).filter(Boolean)));
 
   const filtered = displayCards.filter(c =>
     (!rarityFilter || canonicalRarity(c) === rarityFilter) &&
-    (!versionFilter || c.version === versionFilter) &&
-    (!setFilter || c.set === setFilter)
+    (!versionFilter || c.version === versionFilter)
   );
 
   const resetFilters = () => {
     setRarityFilter('');
     setVersionFilter('');
-    setSetFilter('');
   };
 
   const tabClass = (t: Tab) =>
@@ -407,14 +401,14 @@ function CardList() {
   };
 
   // --- Filtri per tabella lista mancanti ---
-  const listRarities = Array.from(new Set(missingCards.map(c => canonicalRarity(c)).filter(Boolean)));
+  const listRarities = rarityOptionsFor(missingCards, editionPreset);
   const listVersions = Array.from(new Set(missingCards.map(c => c.version).filter(Boolean)));
   const filteredMissingList = missingCards.filter(c =>
     (!listRarityFilter || canonicalRarity(c) === listRarityFilter) &&
     (!listVersionFilter || c.version === listVersionFilter)
   );
 
-  const pendingRarities = Array.from(new Set(pendingCards.map(c => canonicalRarity(c)).filter(Boolean)));
+  const pendingRarities = rarityOptionsFor(pendingCards, editionPreset);
   const pendingVersions = Array.from(new Set(pendingCards.map(c => c.version).filter(Boolean)));
   const filteredPendingList = pendingCards.filter(c =>
     (!pendingRarityFilter || canonicalRarity(c) === pendingRarityFilter) &&
@@ -438,63 +432,25 @@ function CardList() {
   return (
     <div className="p-4">
       <h2 className="text-2xl font-bold mb-3">La tua collezione</h2>
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+      <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
+        <span className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 font-medium text-orange-800">
+          Set selezionato: {editionPresetLabel(editionPreset)}
+        </span>
         <button
           type="button"
-          onClick={() => applyEditionPreset('set1_ed1')}
-          className={`rounded-lg border px-3 py-2 text-sm font-semibold text-left transition-colors ${
-            editionPreset === 'set1_ed1'
-              ? 'bg-orange-600 text-white border-orange-700'
-              : 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100'
-          }`}
+          onClick={() => navigate(collectionId ? `/collection/${collectionId}` : '/')}
+          className="px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 border border-gray-300"
         >
-          Set 1: Konoha Shido 1ed ({set1Ed1Count})
-        </button>
-        <button
-          type="button"
-          onClick={() => applyEditionPreset('set1_ed2')}
-          className={`rounded-lg border px-3 py-2 text-sm font-semibold text-left transition-colors ${
-            editionPreset === 'set1_ed2'
-              ? 'bg-orange-600 text-white border-orange-700'
-              : 'bg-orange-50 text-orange-800 border-orange-200 hover:bg-orange-100'
-          }`}
-        >
-          Set 1: Konoha Shido 2ed ({set1Ed2Count})
-        </button>
-        <button
-          type="button"
-          onClick={() => applyEditionPreset('set2_ed1')}
-          className={`rounded-lg border px-3 py-2 text-sm font-semibold text-left transition-colors ${
-            editionPreset === 'set2_ed1'
-              ? 'bg-blue-600 text-white border-blue-700'
-              : 'bg-blue-50 text-blue-800 border-blue-200 hover:bg-blue-100'
-          }`}
-        >
-          Set 2: Shinobi Shiren 1ed ({set2Ed1Count})
+          ← Torna indietro
         </button>
       </div>
-
-      <div className="mb-3">
-        <button
-          type="button"
-          onClick={() => applyEditionPreset('')}
-          className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 border border-gray-300"
-        >
-          Mostra tutte le edizioni
-        </button>
-      </div>
-
-      {editionPreset && (
-        <div className="mb-3 flex items-center gap-2 text-xs">
-          <span className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 font-medium text-orange-800">
-            Filtro attivo: {editionPresetLabel(editionPreset)}
-          </span>
-        </div>
-      )}
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-1 border-b border-gray-200 mb-4">
+        <button className={tabClass('tutte_set')} onClick={() => openTab('tutte_set')}>
+          🗂 Tutte del set
+          {!loading && <span className="ml-1 text-xs bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full">{setCards.length}</span>}
+        </button>
         <button className={tabClass('possedute')} onClick={() => openTab('possedute')}>
           ✅ Carte possedute
           {!loading && <span className="ml-1 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">{ownedCards.length}</span>}
@@ -775,7 +731,7 @@ function CardList() {
       )}
 
       {/* Tab: Possedute / Mancanti (griglia card) */}
-      {!loading && !error && (tab === 'possedute' || tab === 'mancanti') && (
+      {!loading && !error && (tab === 'tutte_set' || tab === 'possedute' || tab === 'mancanti') && (
         <>
           {/* Filtri */}
           <div className="flex flex-wrap gap-4 mb-4 items-center">
@@ -793,14 +749,9 @@ function CardList() {
                 {versions.map(v => <option key={v} value={v}>{v}</option>)}
               </select>
             </label>
-            <label className="text-sm">
-              Set:
-              <select className="ml-2 border rounded px-2 py-1 text-sm" value={setFilter} onChange={e => setSetFilter(e.target.value)}>
-                <option value="">Tutti</option>
-                {sets.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </label>
-            <span className="ml-auto text-xs text-gray-500">{filtered.length} {tab === 'possedute' ? 'possedute' : 'mancanti'}</span>
+            <span className="ml-auto text-xs text-gray-500">
+              {filtered.length} {tab === 'tutte_set' ? 'totali del set' : (tab === 'possedute' ? 'possedute' : 'mancanti')}
+            </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -808,14 +759,16 @@ function CardList() {
               <div className="col-span-full text-gray-500">
                 {tab === 'possedute'
                   ? (ownedCards.length === 0 ? 'Nessuna carta posseduta.' : 'Nessuna carta corrisponde ai filtri.')
-                  : (missingCards.length === 0 ? '🎉 Collezione completa!' : 'Nessuna carta corrisponde ai filtri.')}
+                  : tab === 'tutte_set'
+                    ? (setCards.length === 0 ? 'Nessuna carta nel set selezionato.' : 'Nessuna carta corrisponde ai filtri.')
+                    : (missingCards.length === 0 ? '🎉 Collezione completa!' : 'Nessuna carta corrisponde ai filtri.')}
               </div>
             )}
             {filtered.map(card => (
               <article
                 key={card.serial_id}
                 className={`border-2 rounded-lg p-3 bg-white flex flex-col items-center ${
-                  tab === 'possedute' ? 'border-green-500' : 'border-red-300 opacity-80'
+                  tab === 'possedute' ? 'border-green-500' : tab === 'mancanti' ? 'border-red-300 opacity-80' : 'border-indigo-300'
                 }`}
               >
                 <div className="flex items-center w-full mb-1">
