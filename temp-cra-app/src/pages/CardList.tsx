@@ -128,7 +128,7 @@ function CardList() {
         .from(userCardsTableName)
         .select('card_uuid')
         .eq('user_id', user.id);
-      if (err2) { setError('Errore caricamento collezione'); setLoading(false); return; }
+      if (err2) { setError(`Errore caricamento collezione (${userCardsTableName}): ${err2.message}`); setLoading(false); return; }
       setOwnedUuids(new Set((uc ?? []).map((r: any) => String(r.card_uuid ?? '').trim()).filter(Boolean)));
 
       const { data: pc, error: err3 } = await supabase
@@ -229,11 +229,12 @@ function CardList() {
     const userCardsTableName = USER_CARDS_TABLE_BY_PRESET[editionPreset];
     const { error: err } = await supabase
       .from(userCardsTableName)
-      .insert({ user_id: user.id, card_uuid: cardUuid, version: card.version ?? 'normale' });
+      .upsert({ user_id: user.id, card_uuid: cardUuid, version: card.version ?? 'normale' }, { onConflict: 'user_id,card_uuid' });
     if (!err) {
       setOwnedUuids(prev => new Set(Array.from(prev).concat(cardUuid)));
     } else {
       console.error('Errore aggiunta:', err);
+      setError(`Errore aggiunta (${userCardsTableName}): ${err.message}`);
     }
   };
 
@@ -285,7 +286,7 @@ function CardList() {
       .filter(c => selectedPendingUuids.has(pendingCardKey(c)))
       .map(c => ({ user_id: user.id, card_uuid: rawCardId(c), version: c.version ?? 'normale' }))
       .filter(r => Boolean(r.card_uuid));
-    const { error: err } = await supabase.from(userCardsTableName).insert(toInsert);
+    const { error: err } = await supabase.from(userCardsTableName).upsert(toInsert, { onConflict: 'user_id,card_uuid' });
     if (!err) {
       if (useSupabasePending) {
         const { error: pendingDeleteErr } = await supabase
@@ -302,6 +303,7 @@ function CardList() {
       setSelectedPendingUuids(new Set());
     } else {
       console.error('Errore importazione in possedute:', err);
+      setError(`Errore importazione (${userCardsTableName}): ${err.message}`);
     }
     setSaving(false);
   };
