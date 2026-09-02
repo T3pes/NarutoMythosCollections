@@ -73,6 +73,12 @@ function CardList() {
 
   const rawCardId = (card: any): string => String(card?.serial_id ?? card?.uid ?? card?.id ?? '').trim();
 
+  const dbCardId = (card: any): number | null => {
+    const value = String(card?.id ?? rawCardId(card) ?? '').trim();
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
   const pendingCardKey = (card: any): string => {
     const raw = rawCardId(card);
     return editionPreset && raw ? `${editionPreset}:${raw}` : raw;
@@ -225,11 +231,18 @@ function CardList() {
   const handleAdd = async (card: any) => {
     if (!user) return;
     const cardUuid = rawCardId(card);
-    if (!editionPreset || !cardUuid) return;
+    const cardId = dbCardId(card);
+    if (!editionPreset || !cardUuid || cardId === null) {
+      setError('Errore aggiunta: card_id non valido per la carta selezionata');
+      return;
+    }
     const userCardsTableName = USER_CARDS_TABLE_BY_PRESET[editionPreset];
     const { error: err } = await supabase
       .from(userCardsTableName)
-      .upsert({ user_id: user.id, card_uuid: cardUuid, version: card.version ?? 'normale' }, { onConflict: 'user_id,card_uuid' });
+      .upsert(
+        { user_id: user.id, card_uuid: cardUuid, card_id: cardId, version: card.version ?? 'normale' },
+        { onConflict: 'user_id,card_uuid' }
+      );
     if (!err) {
       setOwnedUuids(prev => new Set(Array.from(prev).concat(cardUuid)));
     } else {
@@ -284,8 +297,19 @@ function CardList() {
     const userCardsTableName = USER_CARDS_TABLE_BY_PRESET[editionPreset];
     const toInsert = allCards
       .filter(c => selectedPendingUuids.has(pendingCardKey(c)))
-      .map(c => ({ user_id: user.id, card_uuid: rawCardId(c), version: c.version ?? 'normale' }))
-      .filter(r => Boolean(r.card_uuid));
+      .map(c => ({
+        user_id: user.id,
+        card_uuid: rawCardId(c),
+        card_id: dbCardId(c),
+        version: c.version ?? 'normale',
+      }))
+      .filter(r => Boolean(r.card_uuid) && r.card_id !== null);
+
+    if (toInsert.length === 0) {
+      setError('Errore importazione: nessuna carta valida (card_id mancante)');
+      setSaving(false);
+      return;
+    }
     const { error: err } = await supabase.from(userCardsTableName).upsert(toInsert, { onConflict: 'user_id,card_uuid' });
     if (!err) {
       if (useSupabasePending) {
