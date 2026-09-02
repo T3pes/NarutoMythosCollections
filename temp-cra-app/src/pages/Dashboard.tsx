@@ -5,7 +5,7 @@ import { supabase } from '../supabaseClient';
 type EditionPreset = 'set1_ed1' | 'set1_ed2' | 'set2_ed1';
 
 const EDITION_PRESETS: EditionPreset[] = ['set1_ed1', 'set1_ed2', 'set2_ed1'];
-const TABLE_BY_PRESET: Record<EditionPreset, string> = {
+const SOURCE_BY_PRESET: Record<EditionPreset, string> = {
   set1_ed1: 'cards',
   set1_ed2: 'cards_2ed',
   set2_ed1: 'Card_shiren',
@@ -40,11 +40,14 @@ function Dashboard() {
       };
 
       for (const preset of EDITION_PRESETS) {
-        const tableName = TABLE_BY_PRESET[preset];
-        const { data, error: tableError } = await supabase.from(tableName).select('id');
+        const sourceName = SOURCE_BY_PRESET[preset];
+        const { data, error: tableError } = await supabase
+          .from('card_catalog')
+          .select('id')
+          .eq('surce', sourceName);
 
         if (tableError) {
-          setError(`Errore nel caricamento tabella ${tableName}`);
+          setError(`Errore nel caricamento sorgente ${sourceName}`);
           setLoading(false);
           return;
         }

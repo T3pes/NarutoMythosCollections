@@ -6,7 +6,7 @@ import { useAuth } from '../auth/AuthContext';
 type Tab = 'tutte_set' | 'possedute' | 'mancanti' | 'lista' | 'in_arrivo';
 type EditionPreset = '' | 'set1_ed1' | 'set1_ed2' | 'set2_ed1';
 const SET1_ED1_RARITY_ORDER = ['L', 'M', 'S', 'SV', 'U', 'UC', 'MISSION'];
-const TABLE_BY_PRESET: Record<Exclude<EditionPreset, ''>, string> = {
+const SOURCE_BY_PRESET: Record<Exclude<EditionPreset, ''>, string> = {
   set1_ed1: 'cards',
   set1_ed2: 'cards_2ed',
   set2_ed1: 'Card_shiren',
@@ -87,13 +87,14 @@ function CardList() {
       setLoading(true);
       setError(null);
 
-      const tableName = TABLE_BY_PRESET[editionPreset];
+      const sourceName = SOURCE_BY_PRESET[editionPreset];
 
       const { data: cards, error: err1 } = await supabase
-        .from(tableName)
+        .from('card_catalog')
         .select('*')
+        .eq('surce', sourceName)
         .order('id', { ascending: true });
-      if (err1) { setError(`Errore caricamento carte (${tableName})`); setLoading(false); return; }
+      if (err1) { setError(`Errore caricamento carte (${sourceName})`); setLoading(false); return; }
       setAllCards(cards ?? []);
 
       if (!user) { setOwnedUuids(new Set()); setLoading(false); return; }
