@@ -5,7 +5,13 @@ import { useAuth } from '../auth/AuthContext';
 type EditionPreset = '' | 'set1_ed1' | 'set1_ed2' | 'set2_ed1';
 
 function normalizeText(value: unknown): string {
-  return String(value ?? '').toLowerCase().trim();
+  return String(value ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function isFirstEdition(text: string): boolean {
@@ -20,14 +26,12 @@ function matchesEditionPreset(card: any, preset: EditionPreset): boolean {
   if (!preset) return true;
 
   const setText = normalizeText(card?.set);
-  const editionText = normalizeText(card?.edition);
-  const merged = `${setText} ${editionText}`;
-  const inSet1 = setText.includes('set 1') && (setText.includes('konoha') || setText.includes('shido'));
-  const inSet2 = setText.includes('set 2') && (setText.includes('shinobi') || setText.includes('shiren'));
+  const inSet1 = setText.includes('set 1') && setText.includes('konoha');
+  const inSet2 = setText.includes('set 2') && setText.includes('shinobi');
 
-  if (preset === 'set1_ed1') return inSet1 && isFirstEdition(merged);
-  if (preset === 'set1_ed2') return inSet1 && isSecondEdition(merged);
-  if (preset === 'set2_ed1') return inSet2 && isFirstEdition(merged);
+  if (preset === 'set1_ed1') return inSet1 && isFirstEdition(setText);
+  if (preset === 'set1_ed2') return inSet1 && isSecondEdition(setText);
+  if (preset === 'set2_ed1') return inSet2 && isFirstEdition(setText);
   return true;
 }
 
