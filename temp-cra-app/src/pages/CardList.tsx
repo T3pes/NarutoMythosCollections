@@ -21,9 +21,6 @@ function normalizeText(value: unknown): string {
     .trim();
 }
 
-function isFirstEdition(text: string): boolean {
-  return /\b1\s*ed\b/.test(text) || text.includes('1st') || text.includes('first') || text.includes('prima');
-}
 
 function isSecondEdition(text: string): boolean {
   return /\b2\s*ed\b/.test(text) || text.includes('2nd') || text.includes('second') || text.includes('seconda');
@@ -54,7 +51,8 @@ function matchesEditionPreset(card: any, preset: EditionPreset): boolean {
   const inSet1 = setText.includes('set 1') && setText.includes('konoha');
   const inSet2 = setText.includes('set 2') && setText.includes('shinobi');
 
-  if (preset === 'set1_ed1') return inSet1 && isFirstEdition(setText);
+  // Nel DB alcune carte Set 1 non riportano esplicitamente "1 ed".
+  if (preset === 'set1_ed1') return inSet1 && !isSecondEdition(setText);
   if (preset === 'set1_ed2') return inSet1 && isSecondEdition(setText);
   // Set 2 nel dataset spesso non espone esplicitamente il marker edizione.
   if (preset === 'set2_ed1') return inSet2 && !isSecondEdition(setText);
