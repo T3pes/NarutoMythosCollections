@@ -418,11 +418,13 @@ function CardList() {
   const ownedCardsAll = allCards.filter(c => isOwnedCard(c));
   const missingCardsAll = allCards.filter(c => !isOwnedCard(c));
   const pendingCardsAll = allCards.filter(c => isPendingCard(c) && !isOwnedCard(c));
+  const shoppingCardsAll = allCards.filter(c => !isOwnedCard(c) && !isPendingCard(c));
 
   const setCards = allCards;
   const ownedCards = ownedCardsAll;
   const missingCards = missingCardsAll;
   const pendingCards = pendingCardsAll;
+  const shoppingCards = shoppingCardsAll;
 
   const displayCards = tab === 'tutte_set' ? setCards : (tab === 'possedute' ? ownedCards : missingCards);
 
@@ -449,7 +451,7 @@ function CardList() {
   // --- Export CSV (aperto da Excel) ---
   const handleExportExcel = () => {
     const headers = ['#', 'Nome', 'Rarita', 'Versione', 'Tipo', 'Set'];
-    const rows = missingCards.map(c => [
+    const rows = shoppingCards.map(c => [
       c.id,
       `"${(c.name ?? '').replace(/"/g, '""')}"`,
       c.rarity ?? '',
@@ -468,9 +470,9 @@ function CardList() {
   };
 
   // --- Filtri per tabella lista mancanti ---
-  const listRarities = rarityOptionsFor(missingCards, editionPreset);
-  const listVersions = Array.from(new Set(missingCards.map(c => c.version).filter(Boolean)));
-  const filteredMissingList = missingCards.filter(c =>
+  const listRarities = rarityOptionsFor(shoppingCards, editionPreset);
+  const listVersions = Array.from(new Set(shoppingCards.map(c => c.version).filter(Boolean)));
+  const filteredMissingList = shoppingCards.filter(c =>
     (!listRarityFilter || dbRarity(c) === listRarityFilter) &&
     (!listVersionFilter || c.version === listVersionFilter)
   );
@@ -528,7 +530,7 @@ function CardList() {
         </button>
         <button className={tabClass('lista')} onClick={() => openTab('lista')}>
           📋 Lista acquisti
-          {!loading && <span className="ml-1 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{missingCards.length}</span>}
+          {!loading && <span className="ml-1 text-xs bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">{shoppingCards.length}</span>}
         </button>
         <button className={tabClass('in_arrivo')} onClick={() => openTab('in_arrivo')}>
           📦 In attesa di arrivo
@@ -587,7 +589,7 @@ function CardList() {
             )}
             <button
               onClick={handleExportExcel}
-              disabled={missingCards.length === 0}
+              disabled={shoppingCards.length === 0}
               className="ml-auto flex items-center gap-2 px-3 py-1.5 bg-blue-600 text-white text-sm font-semibold rounded hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               ⬇ Scarica CSV (Excel)
@@ -596,7 +598,7 @@ function CardList() {
 
           {/* Tabella */}
           {filteredMissingList.length === 0 ? (
-            <div className="text-gray-500 py-8 text-center">🎉 Collezione completa!</div>
+            <div className="text-gray-500 py-8 text-center">🎉 Nessuna carta da acquistare.</div>
           ) : (
             <div className="overflow-x-auto rounded-lg border border-gray-200">
               <table className="min-w-full text-sm bg-white">
