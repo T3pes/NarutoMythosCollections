@@ -266,19 +266,36 @@ function CardList() {
   const handleRemove = async (card: any) => {
     if (!user) return;
     const raw = rawCardId(card);
-    if (!editionPreset || !raw) return;
+    const cardUuid = dbCardUuid(card);
+    if (!editionPreset) return;
     const userCardsTableName = USER_CARDS_TABLE_BY_PRESET[editionPreset];
-    const { error: err } = await supabase
-      .from(userCardsTableName)
-      .delete()
-      .match({ user_id: user.id, card_uuid: raw });
-    if (err) {
-      console.error('Errore rimozione:', err);
+    let removeErr: any = null;
+
+    // Percorso principale: card_uuid e' UUID nelle tabelle user_cards.
+    if (cardUuid) {
+      const { error } = await supabase
+        .from(userCardsTableName)
+        .delete()
+        .match({ user_id: user.id, card_uuid: cardUuid });
+      removeErr = error;
+    } else if (raw) {
+      // Fallback per eventuali dati storici salvati con id non UUID.
+      const { error } = await supabase
+        .from(userCardsTableName)
+        .delete()
+        .match({ user_id: user.id, card_uuid: raw });
+      removeErr = error;
+    }
+
+    if (removeErr) {
+      console.error('Errore rimozione:', removeErr);
+      setError(`Errore rimozione (${userCardsTableName}): ${removeErr.message}`);
       return;
     }
 
     setOwnedUuids(prev => {
       const next = new Set(Array.from(prev));
+      if (cardUuid) next.delete(cardUuid);
       next.delete(raw);
       return next;
     });
