@@ -23,7 +23,7 @@ export const COLLECTIONS: Collection[] = [
     id: 'pokemon-tcg',
     name: 'Pokemon TCG',
     description: 'Collezione Pokemon (set attivo: Fiamme Spettrali)',
-    logo: '/images/pokemon-logo.png',
+    logo: 'https://ekfwchaoknmsfpqocwsg.supabase.co/storage/v1/object/public/loghi/Pokemon-01.png',
     accentColor: 'blue',
     setName: 'Fiamme Spettrali',
   },
