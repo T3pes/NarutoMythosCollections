@@ -1,4 +1,7 @@
 {
+  "installCommand": "npm --prefix temp-cra-app install",
+  "buildCommand": "npm --prefix temp-cra-app run build",
+  "outputDirectory": "temp-cra-app/build",
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]
