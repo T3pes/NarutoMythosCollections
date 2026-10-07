@@ -19,6 +19,14 @@ export const COLLECTIONS: Collection[] = [
     accentColor: 'orange',
     setName: '',
   },
+  {
+    id: 'pokemon-tcg',
+    name: 'Pokemon TCG',
+    description: 'Collezione Pokemon (set attivo: Fiamme Spettrali)',
+    logo: '/images/pokemon-logo.png',
+    accentColor: 'blue',
+    setName: 'Fiamme Spettrali',
+  },
 ];
 
 interface CollectionContextType {

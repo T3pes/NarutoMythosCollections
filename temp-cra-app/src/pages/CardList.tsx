@@ -4,26 +4,68 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../auth/AuthContext';
 
 type Tab = 'tutte_set' | 'possedute' | 'mancanti' | 'lista' | 'in_arrivo';
-type EditionPreset = '' | 'set1_ed1' | 'set1_ed2' | 'set2_ed1';
+type EditionPreset = '' | 'set1_ed1' | 'set1_ed2' | 'set2_ed1' | 'pokemon_fs_ed1';
 const SET1_ED1_RARITY_ORDER = ['L', 'M', 'S', 'SV', 'U', 'UC', 'MISSION'];
+// Ordine legenda PDF Pokemon (dall'alto verso il basso)
+const POKEMON_FS_RARITY_ORDER = [
+  'SET STANDARD',
+  'SET STANDARD OLOGRAFICO',
+  'COMUNE',
+  'NON COMUNE',
+  'RARA',
+  'RARA DOPPIA',
+  'ULTRARARA',
+  'RARA ILLUSTRAZIONE',
+  'RARA ILLUSTRAZIONE SPECIALE',
+  'RARA IPER MEGA',
+  // Compatibilita con il CSV provvisorio gia caricato
+  'COMUNI',
+  'POKEMON MEGAEVOLUZIONI',
+  'ILLUSTRAZIONI SPECIALI',
+];
+
+const POKEMON_FS_RARITY_ALIASES: Record<string, string> = {
+  'SET STANDARD': 'SET STANDARD',
+  'SET STANDARD OLOGRAFICO': 'SET STANDARD OLOGRAFICO',
+  'COMUNE': 'COMUNE',
+  'COMUNI': 'COMUNI',
+  'NON COMUNE': 'NON COMUNE',
+  'NON-COMUNE': 'NON COMUNE',
+  'RARA': 'RARA',
+  'RARA DOPPIA': 'RARA DOPPIA',
+  'ULTRA RARA': 'ULTRARARA',
+  'ULTRARARA': 'ULTRARARA',
+  'RARA ILLUSTRAZIONE': 'RARA ILLUSTRAZIONE',
+  'RARA ILLUSTRAZIONE SPECIALE': 'RARA ILLUSTRAZIONE SPECIALE',
+  'RARA IPER MEGA': 'RARA IPER MEGA',
+  'POKEMON MEGAEVOLUZIONI': 'POKEMON MEGAEVOLUZIONI',
+  'ILLUSTRAZIONI SPECIALI': 'ILLUSTRAZIONI SPECIALI',
+};
 const TABLE_BY_PRESET: Record<Exclude<EditionPreset, ''>, string> = {
   set1_ed1: 'cards',
   set1_ed2: 'cards_2ed',
   set2_ed1: 'Card_shiren',
+  pokemon_fs_ed1: 'cards_pokemon_fs',
 };
 const USER_CARDS_TABLE_BY_PRESET: Record<Exclude<EditionPreset, ''>, string> = {
   set1_ed1: 'user_cards',
   set1_ed2: 'user_cards_2ed',
   set2_ed1: 'user_cards_shiren',
+  pokemon_fs_ed1: 'user_cards_pokemon_fs',
 };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function parseEditionPreset(value: string | null): EditionPreset {
-  return value === 'set1_ed1' || value === 'set1_ed2' || value === 'set2_ed1' ? value : '';
+  return value === 'set1_ed1' || value === 'set1_ed2' || value === 'set2_ed1' || value === 'pokemon_fs_ed1' ? value : '';
 }
 
 function normalizeRarity(value: unknown): string {
   return String(value ?? '').trim().toUpperCase().replace(/\s+/g, ' ');
+}
+
+function pokemonFsRarityKey(value: unknown): string {
+  const normalized = normalizeRarity(value);
+  return POKEMON_FS_RARITY_ALIASES[normalized] ?? normalized;
 }
 
 function dbRarity(card: any): string {
@@ -37,6 +79,12 @@ function rarityOptionsFor(cards: any[], preset: EditionPreset): string[] {
     const extras = presentRarities.filter(r => !SET1_ED1_RARITY_ORDER.includes(r));
     return [...ordered, ...extras];
   }
+  if (preset === 'pokemon_fs_ed1') {
+    const keyedRarities = Array.from(new Set(cards.map(c => pokemonFsRarityKey(c?.rarity)).filter(Boolean)));
+    const ordered = POKEMON_FS_RARITY_ORDER.filter(r => keyedRarities.includes(r));
+    const extras = keyedRarities.filter(r => !POKEMON_FS_RARITY_ORDER.includes(r));
+    return [...ordered, ...extras];
+  }
   return presentRarities;
 }
 
@@ -44,6 +92,7 @@ function editionPresetLabel(preset: EditionPreset): string {
   if (preset === 'set1_ed1') return 'Set 1: Konoha Shido 1ed';
   if (preset === 'set1_ed2') return 'Set 1: Konoha Shido 2ed';
   if (preset === 'set2_ed1') return 'Set 2: Shinobi Shiren 1ed';
+  if (preset === 'pokemon_fs_ed1') return 'Pokemon: Fiamme Spettrali';
   return 'Set non selezionato';
 }
 

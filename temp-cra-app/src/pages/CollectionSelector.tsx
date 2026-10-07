@@ -5,6 +5,7 @@ import { COLLECTIONS, Collection, useCollection } from '../CollectionContext';
 function CollectionCard({ collection }: { collection: Collection }) {
   const navigate = useNavigate();
   const { setActiveCollection } = useCollection();
+  const isBlue = collection.accentColor === 'blue';
 
   const handleSelect = () => {
     setActiveCollection(collection);
@@ -14,7 +15,7 @@ function CollectionCard({ collection }: { collection: Collection }) {
   return (
     <button
       onClick={handleSelect}
-      className="group relative flex flex-col items-center bg-white rounded-2xl shadow-lg hover:shadow-2xl border-2 border-transparent hover:border-orange-400 transition-all duration-200 overflow-hidden w-64 cursor-pointer"
+      className={`group relative flex flex-col items-center bg-white rounded-2xl shadow-lg hover:shadow-2xl border-2 border-transparent transition-all duration-200 overflow-hidden w-64 cursor-pointer ${isBlue ? 'hover:border-blue-400' : 'hover:border-orange-400'}`}
     >
       {/* Logo */}
       <div className="w-full flex-1 overflow-hidden" style={{ minHeight: 280 }}>
@@ -33,7 +34,7 @@ function CollectionCard({ collection }: { collection: Collection }) {
       </div>
 
       {/* Badge "Seleziona" */}
-      <div className="absolute top-3 right-3 bg-orange-500 text-white text-xs font-semibold px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+      <div className={`absolute top-3 right-3 text-white text-xs font-semibold px-2 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-150 ${isBlue ? 'bg-blue-500' : 'bg-orange-500'}`}>
         Apri →
       </div>
     </button>
