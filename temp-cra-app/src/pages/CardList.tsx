@@ -269,6 +269,46 @@ function CardList() {
     const cardUuid = dbCardUuid(card);
     if (!editionPreset) return;
     const userCardsTableName = USER_CARDS_TABLE_BY_PRESET[editionPreset];
+
+    if (editionPreset === 'pokemon_fs_ed1') {
+      const extraUuid = String(card?.uuid ?? '').trim();
+      const uuidCandidates = Array.from(new Set([cardUuid, extraUuid, raw].filter((v): v is string => Boolean(v && UUID_RE.test(v)))));
+
+      if (uuidCandidates.length === 0) {
+        setError('Errore rimozione: nessun UUID valido trovato per la carta Pokemon selezionata');
+        return;
+      }
+
+      const orFilters = uuidCandidates
+        .flatMap(v => [`card_uuid.eq.${v}`, `card_id.eq.${v}`])
+        .join(',');
+
+      const { data: deletedRows, error: pokemonDeleteErr } = await supabase
+        .from(userCardsTableName)
+        .delete()
+        .eq('user_id', user.id)
+        .or(orFilters)
+        .select('card_uuid');
+
+      if (pokemonDeleteErr) {
+        console.error('Errore rimozione Pokemon:', pokemonDeleteErr);
+        setError(`Errore rimozione (${userCardsTableName}): ${pokemonDeleteErr.message}`);
+        return;
+      }
+
+      if (!deletedRows || deletedRows.length === 0) {
+        setError('Nessuna carta rimossa: verifica che i record Pokemon in user_cards_pokemon_fs usino card_uuid/card_id coerenti');
+        return;
+      }
+
+      setOwnedUuids(prev => {
+        const next = new Set(Array.from(prev));
+        uuidCandidates.forEach(v => next.delete(v));
+        return next;
+      });
+      return;
+    }
+
     let removeErr: any = null;
 
     // Percorso principale: card_uuid e' UUID nelle tabelle user_cards.
