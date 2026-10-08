@@ -4,7 +4,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../auth/AuthContext';
 
 type Tab = 'tutte_set' | 'possedute' | 'mancanti' | 'lista' | 'in_arrivo';
-type EditionPreset = '' | 'set1_ed1' | 'set1_ed2' | 'set2_ed1' | 'pokemon_fs_ed1';
+type EditionPreset = '' | 'set1_ed1' | 'set1_ed2' | 'set2_ed1' | 'pokemon_fs_ed1' | 'pokemon_bp_ed1';
 const SET1_ED1_RARITY_ORDER = ['L', 'M', 'S', 'SV', 'U', 'UC', 'MISSION'];
 // Ordine legenda PDF Pokemon (dall'alto verso il basso)
 const POKEMON_FS_RARITY_ORDER = [
@@ -46,17 +46,23 @@ const TABLE_BY_PRESET: Record<Exclude<EditionPreset, ''>, string> = {
   set1_ed2: 'cards_2ed',
   set2_ed1: 'Card_shiren',
   pokemon_fs_ed1: 'cards_pokemon_fs',
+  pokemon_bp_ed1: 'cards_pokemon_bp',
 };
 const USER_CARDS_TABLE_BY_PRESET: Record<Exclude<EditionPreset, ''>, string> = {
   set1_ed1: 'user_cards',
   set1_ed2: 'user_cards_2ed',
   set2_ed1: 'user_cards_shiren',
   pokemon_fs_ed1: 'user_cards_pokemon_fs',
+  pokemon_bp_ed1: 'user_cards_pokemon_bp',
 };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function parseEditionPreset(value: string | null): EditionPreset {
-  return value === 'set1_ed1' || value === 'set1_ed2' || value === 'set2_ed1' || value === 'pokemon_fs_ed1' ? value : '';
+  return value === 'set1_ed1' || value === 'set1_ed2' || value === 'set2_ed1' || value === 'pokemon_fs_ed1' || value === 'pokemon_bp_ed1' ? value : '';
+}
+
+function isPokemonPreset(preset: EditionPreset): boolean {
+  return preset.startsWith('pokemon_');
 }
 
 function normalizeRarity(value: unknown): string {
@@ -93,6 +99,7 @@ function editionPresetLabel(preset: EditionPreset): string {
   if (preset === 'set1_ed2') return 'Set 1: Konoha Shido 2ed';
   if (preset === 'set2_ed1') return 'Set 2: Shinobi Shiren 1ed';
   if (preset === 'pokemon_fs_ed1') return 'Pokemon: Fiamme Spettrali';
+  if (preset === 'pokemon_bp_ed1') return 'Pokemon: Buio Pesto';
   return 'Set non selezionato';
 }
 
@@ -270,7 +277,7 @@ function CardList() {
     if (!editionPreset) return;
     const userCardsTableName = USER_CARDS_TABLE_BY_PRESET[editionPreset];
 
-    if (editionPreset === 'pokemon_fs_ed1') {
+    if (isPokemonPreset(editionPreset)) {
       const extraUuid = String(card?.uuid ?? '').trim();
       const uuidCandidates = Array.from(new Set([cardUuid, extraUuid, raw].filter((v): v is string => Boolean(v && UUID_RE.test(v)))));
 

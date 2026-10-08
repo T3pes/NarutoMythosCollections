@@ -22,10 +22,10 @@ export const COLLECTIONS: Collection[] = [
   {
     id: 'pokemon-tcg',
     name: 'Pokemon TCG',
-    description: 'Collezione Pokemon (set attivo: Fiamme Spettrali)',
+    description: 'Collezione Pokemon (set disponibili: Fiamme Spettrali, Buio Pesto)',
     logo: 'https://ekfwchaoknmsfpqocwsg.supabase.co/storage/v1/object/public/loghi/Pokemon-01.png',
     accentColor: 'blue',
-    setName: 'Fiamme Spettrali',
+    setName: 'Fiamme Spettrali, Buio Pesto',
   },
 ];
 

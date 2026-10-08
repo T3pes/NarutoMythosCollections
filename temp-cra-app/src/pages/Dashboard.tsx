@@ -3,11 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../supabaseClient';
 
 type EditionPreset = 'set1_ed1' | 'set1_ed2' | 'set2_ed1';
-type ExtendedEditionPreset = EditionPreset | 'pokemon_fs_ed1';
+type ExtendedEditionPreset = EditionPreset | 'pokemon_fs_ed1' | 'pokemon_bp_ed1';
 
 const PRESETS_BY_COLLECTION: Record<string, ExtendedEditionPreset[]> = {
   'naruto-mythos': ['set1_ed1', 'set1_ed2', 'set2_ed1'],
-  'pokemon-tcg': ['pokemon_fs_ed1'],
+  'pokemon-tcg': ['pokemon_fs_ed1', 'pokemon_bp_ed1'],
 };
 
 const TABLE_BY_PRESET: Record<ExtendedEditionPreset, string> = {
@@ -15,12 +15,14 @@ const TABLE_BY_PRESET: Record<ExtendedEditionPreset, string> = {
   set1_ed2: 'cards_2ed',
   set2_ed1: 'Card_shiren',
   pokemon_fs_ed1: 'cards_pokemon_fs',
+  pokemon_bp_ed1: 'cards_pokemon_bp',
 };
 
 function editionPresetLabel(preset: ExtendedEditionPreset): string {
   if (preset === 'set1_ed1') return 'Set 1: Konoha Shido 1ed';
   if (preset === 'set1_ed2') return 'Set 1: Konoha Shido 2ed';
   if (preset === 'pokemon_fs_ed1') return 'Pokemon: Fiamme Spettrali';
+  if (preset === 'pokemon_bp_ed1') return 'Pokemon: Buio Pesto';
   return 'Set 2: Shinobi Shiren 1ed';
 }
 
@@ -32,6 +34,7 @@ function Dashboard() {
     set1_ed2: 0,
     set2_ed1: 0,
     pokemon_fs_ed1: 0,
+    pokemon_bp_ed1: 0,
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -48,6 +51,7 @@ function Dashboard() {
         set1_ed2: 0,
         set2_ed1: 0,
         pokemon_fs_ed1: 0,
+        pokemon_bp_ed1: 0,
       };
 
       for (const preset of presetsForCollection) {
@@ -103,7 +107,7 @@ function Dashboard() {
 
       <div className="flex flex-wrap gap-8 justify-center">
         {presetsForCollection.map(preset => {
-          const isPokemon = preset === 'pokemon_fs_ed1';
+          const isPokemon = preset.startsWith('pokemon_');
           const isSet2 = preset === 'set2_ed1';
           return (
             <button
